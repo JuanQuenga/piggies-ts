@@ -10,15 +10,30 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as DevRouteImport } from './routes/dev'
 import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPortalRouteImport } from './routes/api/portal'
+import { Route as ApiCheckoutRouteImport } from './routes/api/checkout'
+import { Route as AuthenticatedWhoViewedMeRouteImport } from './routes/_authenticated/who-viewed-me'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
+import { Route as AuthenticatedAlbumRouteImport } from './routes/_authenticated/album'
+import { Route as ApiWebhookPolarRouteImport } from './routes/api/webhook/polar'
 import { Route as ApiAuthCallbackRouteImport } from './routes/api/auth/callback'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevRoute = DevRouteImport.update({
+  id: '/dev',
+  path: '/dev',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CallbackRoute = CallbackRouteImport.update({
@@ -35,10 +50,56 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPortalRoute = ApiPortalRouteImport.update({
+  id: '/api/portal',
+  path: '/api/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCheckoutRoute = ApiCheckoutRouteImport.update({
+  id: '/api/checkout',
+  path: '/api/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedWhoViewedMeRoute =
+  AuthenticatedWhoViewedMeRouteImport.update({
+    id: '/who-viewed-me',
+    path: '/who-viewed-me',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMessagesRoute = AuthenticatedMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
   id: '/home',
   path: '/home',
   getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAlbumRoute = AuthenticatedAlbumRouteImport.update({
+  id: '/album',
+  path: '/album',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const ApiWebhookPolarRoute = ApiWebhookPolarRouteImport.update({
+  id: '/api/webhook/polar',
+  path: '/api/webhook/polar',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthCallbackRoute = ApiAuthCallbackRouteImport.update({
   id: '/api/auth/callback',
@@ -49,47 +110,121 @@ const ApiAuthCallbackRoute = ApiAuthCallbackRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
+  '/dev': typeof DevRoute
   '/login': typeof LoginRoute
+  '/album': typeof AuthenticatedAlbumRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/messages': typeof AuthenticatedMessagesRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/who-viewed-me': typeof AuthenticatedWhoViewedMeRoute
+  '/api/checkout': typeof ApiCheckoutRoute
+  '/api/portal': typeof ApiPortalRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
+  '/api/webhook/polar': typeof ApiWebhookPolarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
+  '/dev': typeof DevRoute
   '/login': typeof LoginRoute
+  '/album': typeof AuthenticatedAlbumRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/messages': typeof AuthenticatedMessagesRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/who-viewed-me': typeof AuthenticatedWhoViewedMeRoute
+  '/api/checkout': typeof ApiCheckoutRoute
+  '/api/portal': typeof ApiPortalRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
+  '/api/webhook/polar': typeof ApiWebhookPolarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/callback': typeof CallbackRoute
+  '/dev': typeof DevRoute
   '/login': typeof LoginRoute
+  '/_authenticated/album': typeof AuthenticatedAlbumRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
+  '/_authenticated/messages': typeof AuthenticatedMessagesRoute
+  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/who-viewed-me': typeof AuthenticatedWhoViewedMeRoute
+  '/api/checkout': typeof ApiCheckoutRoute
+  '/api/portal': typeof ApiPortalRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
+  '/api/webhook/polar': typeof ApiWebhookPolarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/callback' | '/login' | '/home' | '/api/auth/callback'
+  fullPaths:
+    | '/'
+    | '/callback'
+    | '/dev'
+    | '/login'
+    | '/album'
+    | '/home'
+    | '/messages'
+    | '/onboarding'
+    | '/profile'
+    | '/settings'
+    | '/who-viewed-me'
+    | '/api/checkout'
+    | '/api/portal'
+    | '/api/auth/callback'
+    | '/api/webhook/polar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/callback' | '/login' | '/home' | '/api/auth/callback'
+  to:
+    | '/'
+    | '/callback'
+    | '/dev'
+    | '/login'
+    | '/album'
+    | '/home'
+    | '/messages'
+    | '/onboarding'
+    | '/profile'
+    | '/settings'
+    | '/who-viewed-me'
+    | '/api/checkout'
+    | '/api/portal'
+    | '/api/auth/callback'
+    | '/api/webhook/polar'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/callback'
+    | '/dev'
     | '/login'
+    | '/_authenticated/album'
     | '/_authenticated/home'
+    | '/_authenticated/messages'
+    | '/_authenticated/onboarding'
+    | '/_authenticated/profile'
+    | '/_authenticated/settings'
+    | '/_authenticated/who-viewed-me'
+    | '/api/checkout'
+    | '/api/portal'
     | '/api/auth/callback'
+    | '/api/webhook/polar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   CallbackRoute: typeof CallbackRoute
+  DevRoute: typeof DevRoute
   LoginRoute: typeof LoginRoute
+  ApiCheckoutRoute: typeof ApiCheckoutRoute
+  ApiPortalRoute: typeof ApiPortalRoute
   ApiAuthCallbackRoute: typeof ApiAuthCallbackRoute
+  ApiWebhookPolarRoute: typeof ApiWebhookPolarRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +234,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev': {
+      id: '/dev'
+      path: '/dev'
+      fullPath: '/dev'
+      preLoaderRoute: typeof DevRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/callback': {
@@ -122,12 +264,75 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/portal': {
+      id: '/api/portal'
+      path: '/api/portal'
+      fullPath: '/api/portal'
+      preLoaderRoute: typeof ApiPortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/checkout': {
+      id: '/api/checkout'
+      path: '/api/checkout'
+      fullPath: '/api/checkout'
+      preLoaderRoute: typeof ApiCheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/who-viewed-me': {
+      id: '/_authenticated/who-viewed-me'
+      path: '/who-viewed-me'
+      fullPath: '/who-viewed-me'
+      preLoaderRoute: typeof AuthenticatedWhoViewedMeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/messages': {
+      id: '/_authenticated/messages'
+      path: '/messages'
+      fullPath: '/messages'
+      preLoaderRoute: typeof AuthenticatedMessagesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/home': {
       id: '/_authenticated/home'
       path: '/home'
       fullPath: '/home'
       preLoaderRoute: typeof AuthenticatedHomeRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/album': {
+      id: '/_authenticated/album'
+      path: '/album'
+      fullPath: '/album'
+      preLoaderRoute: typeof AuthenticatedAlbumRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/webhook/polar': {
+      id: '/api/webhook/polar'
+      path: '/api/webhook/polar'
+      fullPath: '/api/webhook/polar'
+      preLoaderRoute: typeof ApiWebhookPolarRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/auth/callback': {
       id: '/api/auth/callback'
@@ -140,11 +345,23 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAlbumRoute: typeof AuthenticatedAlbumRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
+  AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
+  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedWhoViewedMeRoute: typeof AuthenticatedWhoViewedMeRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAlbumRoute: AuthenticatedAlbumRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
+  AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
+  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedWhoViewedMeRoute: AuthenticatedWhoViewedMeRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -155,8 +372,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   CallbackRoute: CallbackRoute,
+  DevRoute: DevRoute,
   LoginRoute: LoginRoute,
+  ApiCheckoutRoute: ApiCheckoutRoute,
+  ApiPortalRoute: ApiPortalRoute,
   ApiAuthCallbackRoute: ApiAuthCallbackRoute,
+  ApiWebhookPolarRoute: ApiWebhookPolarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

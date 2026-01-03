@@ -11,3 +11,7 @@ count.txt
 .output
 .vinxi
 todos.json
+
+# Dev-only files (not for production)
+src/routes/dev.tsx
+convex/dev.ts

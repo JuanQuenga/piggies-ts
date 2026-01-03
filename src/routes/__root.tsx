@@ -7,6 +7,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { AuthKitProvider } from '@workos/authkit-tanstack-react-start/client'
+import { Toaster } from 'sonner'
 
 import appCss from '../styles.css?url'
 
@@ -73,6 +74,14 @@ function RootComponent() {
   return (
     <AuthKitProvider>
       <Outlet />
+      <Toaster
+        position="top-center"
+        richColors
+        closeButton
+        toastOptions={{
+          className: 'font-sans',
+        }}
+      />
     </AuthKitProvider>
   )
 }
