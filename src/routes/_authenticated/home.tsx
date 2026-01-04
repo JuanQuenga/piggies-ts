@@ -35,6 +35,8 @@ import {
   Zap,
   Shield,
   Star,
+  Navigation,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -53,6 +55,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 
 export const Route = createFileRoute('/_authenticated/home')({
   component: HomePage,
@@ -87,22 +90,81 @@ function HomePage() {
   const [onlineOnly, setOnlineOnly] = useState(false)
   const [withPhotos, setWithPhotos] = useState(false)
   const [ageFilter, setAgeFilter] = useState<{ min?: number; max?: number } | null>(null)
-  const [selectedLocation, setSelectedLocation] = useState('Downtown')
   const [interestFilter, setInterestFilter] = useState<string[]>([])
   const [interestDialogOpen, setInterestDialogOpen] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<Set<InterestCategory>>(new Set(['hobbies']))
 
-  const locations = [
-    'Downtown',
-    'Midtown',
-    'Uptown',
-    'West Side',
-    'East Side',
-    'North End',
-    'South End',
-    'Suburbs',
-    'Nearby',
-  ]
+  // Location state
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false)
+  const [locationType, setLocationType] = useState<'nearby' | 'custom'>('nearby')
+  const [customLocation, setCustomLocation] = useState('')
+  const [customLocationInput, setCustomLocationInput] = useState('')
+  const [isGettingLocation, setIsGettingLocation] = useState(false)
+  const [nearbyLocationName, setNearbyLocationName] = useState<string | null>(null)
+
+  const getLocationDisplayText = () => {
+    if (locationType === 'nearby') {
+      return nearbyLocationName || 'Nearby'
+    }
+    return customLocation || 'Set Location'
+  }
+
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser')
+      return
+    }
+
+    setIsGettingLocation(true)
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+        // Try to get city name from coordinates using reverse geocoding
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+          )
+          const data = await response.json()
+          const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || 'Nearby'
+          setNearbyLocationName(city)
+        } catch {
+          setNearbyLocationName('Nearby')
+        }
+        setLocationType('nearby')
+        setIsGettingLocation(false)
+        setLocationDialogOpen(false)
+        toast.success('Location updated!')
+      },
+      (error) => {
+        setIsGettingLocation(false)
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            toast.error('Location access denied. Please enable location permissions.')
+            break
+          case error.POSITION_UNAVAILABLE:
+            toast.error('Location information unavailable.')
+            break
+          case error.TIMEOUT:
+            toast.error('Location request timed out.')
+            break
+          default:
+            toast.error('Unable to get your location.')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    )
+  }
+
+  const handleSetCustomLocation = () => {
+    if (!customLocationInput.trim()) {
+      toast.error('Please enter a city or zip code')
+      return
+    }
+    setCustomLocation(customLocationInput.trim())
+    setLocationType('custom')
+    setLocationDialogOpen(false)
+    toast.success('Location updated!')
+  }
 
   // Get nearby users from Convex (including self)
   const nearbyUsers = useQuery(
@@ -202,26 +264,84 @@ function HomePage() {
             <span className="text-lg font-bold hidden sm:block">Piggies</span>
           </Link>
 
-          {/* Location Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-2 bg-card border border-border rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer">
+          {/* Location Selector */}
+          <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
+            <DialogTrigger
+              className="flex items-center gap-2 bg-card border border-border rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer"
+            >
               <MapPin className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">{selectedLocation}</span>
+              <span className="text-sm font-medium truncate max-w-[120px]">{getLocationDisplayText()}</span>
               <ChevronDown className="w-3 h-3 text-muted-foreground" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-48 bg-card border-border">
-              {locations.map((location) => (
-                <DropdownMenuItem
-                  key={location}
-                  className={`cursor-pointer ${selectedLocation === location ? 'bg-accent' : ''}`}
-                  onClick={() => setSelectedLocation(location)}
+            </DialogTrigger>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Set Your Location</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                {/* Use My Location Option */}
+                <button
+                  onClick={handleUseMyLocation}
+                  disabled={isGettingLocation}
+                  className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                    locationType === 'nearby' && nearbyLocationName
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                  } ${isGettingLocation ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
                 >
-                  <MapPin className={`mr-2 w-4 h-4 ${selectedLocation === location ? 'text-primary' : 'text-muted-foreground'}`} />
-                  {location}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                    {isGettingLocation ? (
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    ) : (
+                      <Navigation className="w-5 h-5 text-primary" />
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-foreground">Use My Location</p>
+                    <p className="text-sm text-muted-foreground">
+                      {isGettingLocation
+                        ? 'Getting location...'
+                        : nearbyLocationName
+                          ? `Currently: ${nearbyLocationName}`
+                          : 'Find people near you'}
+                    </p>
+                  </div>
+                </button>
+
+                {/* Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground">or</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+
+                {/* City/Zip Input */}
+                <div className="space-y-3">
+                  <p className="font-semibold text-foreground">Enter City or Zip Code</p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g., Miami or 33101"
+                      value={customLocationInput}
+                      onChange={(e) => setCustomLocationInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSetCustomLocation()
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleSetCustomLocation} size="sm">
+                      Set
+                    </Button>
+                  </div>
+                  {locationType === 'custom' && customLocation && (
+                    <p className="text-sm text-muted-foreground">
+                      Currently set to: <span className="text-primary font-medium">{customLocation}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Nav Icons */}
           <div className="flex items-center gap-1">
