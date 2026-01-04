@@ -8,6 +8,8 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { AuthKitProvider } from '@workos/authkit-tanstack-react-start/client'
 import { Toaster } from 'sonner'
+import { useEffect } from 'react'
+import { storeReferralCode } from '@/hooks/useCurrentUser'
 
 import appCss from '../styles.css?url'
 
@@ -71,6 +73,17 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  // Capture referral code from URL and store in localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const ref = urlParams.get('ref')
+      if (ref) {
+        storeReferralCode(ref)
+      }
+    }
+  }, [])
+
   return (
     <AuthKitProvider>
       <Outlet />

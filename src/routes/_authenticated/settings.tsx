@@ -12,6 +12,7 @@ import {
   Bell,
   Shield,
   Eye,
+  EyeOff,
   MapPin,
   Moon,
   Smartphone,
@@ -25,7 +26,10 @@ import {
   Lock,
   Globe,
   ImageIcon,
+  Users,
+  Gift,
 } from 'lucide-react'
+import { useReferrals } from '@/hooks/useReferrals'
 
 export const Route = createFileRoute('/_authenticated/settings')({
   component: SettingsPage,
@@ -50,6 +54,7 @@ function SettingsPage() {
   const { user: workosUser, signOut } = useAuth()
   const { user: convexUser } = useCurrentUser()
   const { isUltra, portalUrl, checkoutUrl } = useSubscription()
+  const { activatedReferrals, hasReferralUltra, referralUltraDaysRemaining } = useReferrals()
   const updatePreferences = useMutation(api.users.updateUserPreferences)
 
   // Use values from database with defaults
@@ -57,6 +62,7 @@ function SettingsPage() {
   const emailNotifications = convexUser?.emailNotificationsEnabled ?? true
   const locationSharing = convexUser?.locationSharingEnabled ?? true
   const showOnlineStatus = convexUser?.showOnlineStatus ?? true
+  const hideFromDiscovery = convexUser?.hideFromDiscovery ?? false
 
   const handleTogglePushNotifications = async () => {
     if (!convexUser?._id) return
@@ -109,6 +115,20 @@ function SettingsPage() {
         showOnlineStatus: newValue,
       })
       toast.success(newValue ? 'Online status visible' : 'Online status hidden')
+    } catch {
+      toast.error('Failed to update privacy settings')
+    }
+  }
+
+  const handleToggleHideFromDiscovery = async () => {
+    if (!convexUser?._id) return
+    const newValue = !hideFromDiscovery
+    try {
+      await updatePreferences({
+        userId: convexUser._id,
+        hideFromDiscovery: newValue,
+      })
+      toast.success(newValue ? 'You are now hidden from discovery' : 'You are now visible in discovery')
     } catch {
       toast.error('Failed to update privacy settings')
     }
@@ -169,8 +189,35 @@ function SettingsPage() {
       ],
     },
     {
+      title: 'Referrals',
+      items: [
+        {
+          icon: <Gift className="w-5 h-5" />,
+          label: 'Invite Friends',
+          description: hasReferralUltra
+            ? `${referralUltraDaysRemaining}d of free Ultra remaining`
+            : `${activatedReferrals}/3 referrals to free Ultra`,
+          action: () => navigate({ to: '/referrals' }),
+          rightElement: hasReferralUltra ? (
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          ) : (
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          ),
+        },
+      ],
+    },
+    {
       title: 'Privacy',
       items: [
+        {
+          icon: <Users className="w-5 h-5" />,
+          label: 'Hide from Discovery',
+          description: 'Don\'t show me in the discovery grid',
+          rightElement: <ToggleSwitch enabled={hideFromDiscovery} onToggle={handleToggleHideFromDiscovery} />,
+        },
         {
           icon: <Eye className="w-5 h-5" />,
           label: 'Show Online Status',

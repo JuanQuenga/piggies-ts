@@ -8,26 +8,33 @@ import { useSubscription } from '@/hooks/useSubscription'
 import { Id } from '../../../convex/_generated/dataModel'
 import { formatDistanceToNow } from '@/lib/date-utils'
 import { INTEREST_CATEGORIES, type InterestCategory } from '@/lib/interests'
+import { toast } from 'sonner'
 import {
   Grid3X3,
   MapPin,
   MessageCircle,
   Bell,
-  Search,
   Filter,
   LogOut,
   Settings,
   User,
-  Heart,
   Sparkles,
   X,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Flame,
   Eye,
-  Camera,
   Users,
   Tags,
+  Share2,
+  UserPlus,
+  Image,
+  Heart,
+  Zap,
+  Shield,
+  Star,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -57,11 +64,12 @@ type NearbyUser = {
   imageUrl?: string
   isOnline?: boolean
   lastActive?: number
+  isSelf?: boolean
   profile: {
     displayName?: string
     bio?: string
     age?: number
-    profilePhotos?: string[]
+    profilePhotoUrls?: string[]
     lookingFor?: string
     interests?: string[]
     onboardingComplete?: boolean
@@ -74,6 +82,7 @@ function HomePage() {
   const { isUltra, checkoutUrl, portalUrl } = useSubscription()
   const navigate = useNavigate()
   const [selectedUser, setSelectedUser] = useState<NearbyUser | null>(null)
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [onlineOnly, setOnlineOnly] = useState(false)
   const [withPhotos, setWithPhotos] = useState(false)
@@ -95,7 +104,7 @@ function HomePage() {
     'Nearby',
   ]
 
-  // Get nearby users from Convex
+  // Get nearby users from Convex (including self)
   const nearbyUsers = useQuery(
     api.users.getNearbyUsers,
     convexUser?._id ? {
@@ -105,6 +114,7 @@ function HomePage() {
       minAge: ageFilter?.min,
       maxAge: ageFilter?.max,
       interests: interestFilter.length > 0 ? interestFilter : undefined,
+      includeSelf: true,
     } : "skip"
   )
 
@@ -172,7 +182,7 @@ function HomePage() {
 
   const getProfileImage = (user: NearbyUser) => {
     // Use profile photo if available, otherwise fall back to user image
-    return user.profile?.profilePhotos?.[0] || user.imageUrl
+    return user.profile?.profilePhotoUrls?.[0] || user.imageUrl
   }
 
   const getDisplayName = (user: NearbyUser) => {
@@ -215,7 +225,12 @@ function HomePage() {
 
           {/* Nav Icons */}
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative"
+              onClick={() => toast.info('Trending users coming soon!')}
+            >
               <Flame className="w-5 h-5 text-primary" />
             </Button>
             <Button 
@@ -231,7 +246,12 @@ function HomePage() {
                 </span>
               )}
             </Button>
-            <Button variant="ghost" size="icon" className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative"
+              onClick={() => toast.info('Notifications coming soon!')}
+            >
               <Bell className="w-5 h-5" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
             </Button>
@@ -495,76 +515,246 @@ function HomePage() {
             )}
           </div>
         ) : (
-          <div className={`grid gap-1.5 sm:gap-2 ${
-            viewMode === 'grid'
-              ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8'
-              : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'
-          }`}>
-            {nearbyUsers.map((nearbyUser) => (
-              <div
-                key={nearbyUser._id}
-                onClick={() => setSelectedUser(nearbyUser)}
-                className="profile-card aspect-[3/4] rounded-lg overflow-hidden cursor-pointer group relative bg-card"
-              >
-                {getProfileImage(nearbyUser) ? (
-                  <img
-                    src={getProfileImage(nearbyUser)}
-                    alt={getDisplayName(nearbyUser)}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <User className="w-12 h-12 text-muted-foreground" />
+          <>
+            <div className={`grid gap-1.5 sm:gap-2 ${
+              viewMode === 'grid'
+                ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8'
+                : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'
+            }`}>
+              {nearbyUsers.map((nearbyUser) => (
+                <div
+                  key={nearbyUser._id}
+                  onClick={() => {
+                    if (nearbyUser.isSelf) {
+                      navigate({ to: '/profile' })
+                    } else {
+                      setCurrentPhotoIndex(0)
+                      setSelectedUser(nearbyUser)
+                    }
+                  }}
+                  className={`profile-card aspect-[3/4] rounded-lg overflow-hidden cursor-pointer group relative bg-card ${
+                    nearbyUser.isSelf ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
+                  }`}
+                >
+                  {getProfileImage(nearbyUser) ? (
+                    <img
+                      src={getProfileImage(nearbyUser)}
+                      alt={getDisplayName(nearbyUser)}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <User className="w-12 h-12 text-muted-foreground" />
+                    </div>
+                  )}
+
+                  {/* "You" badge for self */}
+                  {nearbyUser.isSelf && (
+                    <div className="absolute top-2 left-2 px-2 py-0.5 bg-primary text-white text-xs font-bold rounded-full">
+                      You
+                    </div>
+                  )}
+
+                  {/* Online indicator */}
+                  {nearbyUser.isOnline && !nearbyUser.isSelf && (
+                    <div className="absolute top-2 right-2 w-3 h-3 bg-online rounded-full border-2 border-black/50 online-indicator" />
+                  )}
+
+                  {/* Gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+
+                  {/* User info */}
+                  <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3">
+                    <div className="flex items-center gap-1">
+                      <p className="font-bold text-white text-sm truncate">
+                        {getDisplayName(nearbyUser)}
+                        {nearbyUser.profile?.age && `, ${nearbyUser.profile.age}`}
+                      </p>
+                    </div>
+                    {nearbyUser.profile?.lookingFor && (
+                      <p className="text-xs text-white/70 truncate">
+                        {nearbyUser.profile.lookingFor}
+                      </p>
+                    )}
                   </div>
-                )}
 
-                {/* Online indicator */}
-                {nearbyUser.isOnline && (
-                  <div className="absolute top-2 right-2 w-3 h-3 bg-online rounded-full border-2 border-black/50 online-indicator" />
-                )}
+                  {/* Hover overlay with view profile - only for other users */}
+                  {!nearbyUser.isSelf && (
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <Button
+                        size="sm"
+                        className="bg-primary hover:bg-primary/90"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setCurrentPhotoIndex(0)
+                          setSelectedUser(nearbyUser)
+                        }}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Profile
+                      </Button>
+                    </div>
+                  )}
 
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-
-                {/* User info */}
-                <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3">
-                  <div className="flex items-center gap-1">
-                    <p className="font-bold text-white text-sm truncate">
-                      {getDisplayName(nearbyUser)}
-                      {nearbyUser.profile?.age && `, ${nearbyUser.profile.age}`}
-                    </p>
-                  </div>
-                  {nearbyUser.profile?.lookingFor && (
-                    <p className="text-xs text-white/70 truncate">
-                      {nearbyUser.profile.lookingFor}
-                    </p>
+                  {/* Hover overlay for self - edit profile prompt */}
+                  {nearbyUser.isSelf && (
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <Button
+                        size="sm"
+                        className="bg-primary hover:bg-primary/90"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate({ to: '/profile' })
+                        }}
+                      >
+                        Edit Profile
+                      </Button>
+                    </div>
                   )}
                 </div>
+              ))}
+            </div>
 
-                {/* Hover overlay with actions */}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="w-12 h-12 rounded-full border-2 border-white/30 bg-transparent hover:bg-white/10 hover:border-white/50"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleMessageUser(nearbyUser._id)
-                    }}
-                  >
-                    <MessageCircle className="w-5 h-5 text-white" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    className="w-12 h-12 rounded-full bg-primary hover:bg-primary/90 glow-red"
-                    onClick={(e) => { e.stopPropagation() }}
-                  >
-                    <Heart className="w-5 h-5 text-white" />
-                  </Button>
+            {/* Low Activity Content - shows when there are few users */}
+            {nearbyUsers.length < 8 && (
+              <div className="mt-8 space-y-6 pb-4">
+                {/* Invite Friends Section */}
+                <div className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border border-primary/30 rounded-2xl p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+                      <UserPlus className="w-6 h-6 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-foreground mb-1">Grow Your Network</h3>
+                      <p className="text-muted-foreground text-sm mb-4">
+                        Know someone who'd love Piggies? Invite your friends and help build the community!
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => {
+                            navigator.clipboard.writeText(window.location.origin)
+                            toast.success('Link copied to clipboard!')
+                          }}
+                        >
+                          <Share2 className="w-4 h-4" />
+                          Copy Invite Link
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 border-border"
+                          onClick={() => navigate({ to: '/referrals' })}
+                        >
+                          <Star className="w-4 h-4" />
+                          Referral Program
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Getting Started Tips */}
+                <div className="bg-card border border-border rounded-2xl p-6">
+                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-amber-500" />
+                    Quick Tips to Get Noticed
+                  </h3>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div
+                      className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                      onClick={() => navigate({ to: '/profile' })}
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
+                        <Image className="w-5 h-5 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground text-sm">Add More Photos</p>
+                        <p className="text-xs text-muted-foreground">Profiles with 3+ photos get 5x more views</p>
+                      </div>
+                    </div>
+                    <div
+                      className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                      onClick={() => navigate({ to: '/profile' })}
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center shrink-0">
+                        <User className="w-5 h-5 text-green-500" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground text-sm">Complete Your Bio</p>
+                        <p className="text-xs text-muted-foreground">Tell others what makes you unique</p>
+                      </div>
+                    </div>
+                    <div
+                      className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                      onClick={() => navigate({ to: '/profile' })}
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
+                        <Heart className="w-5 h-5 text-purple-500" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground text-sm">Add Your Interests</p>
+                        <p className="text-xs text-muted-foreground">Match with people who share your passions</p>
+                      </div>
+                    </div>
+                    <div
+                      className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                      onClick={() => setOnlineOnly(false)}
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center shrink-0">
+                        <Users className="w-5 h-5 text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground text-sm">Check Back Often</p>
+                        <p className="text-xs text-muted-foreground">New users join every day</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Feature Highlights */}
+                <div className="bg-card border border-border rounded-2xl p-6">
+                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    Discover Piggies Features
+                  </h3>
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    <div
+                      className="text-center p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                      onClick={handleGoToMessages}
+                    >
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
+                        <MessageCircle className="w-6 h-6 text-primary" />
+                      </div>
+                      <p className="font-semibold text-foreground text-sm">Instant Messaging</p>
+                      <p className="text-xs text-muted-foreground mt-1">Chat with matches in real-time</p>
+                    </div>
+                    <div
+                      className="text-center p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                      onClick={() => navigate({ to: '/who-viewed-me' })}
+                    >
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
+                        <Eye className="w-6 h-6 text-primary" />
+                      </div>
+                      <p className="font-semibold text-foreground text-sm">Who Viewed Me</p>
+                      <p className="text-xs text-muted-foreground mt-1">See who's checking you out</p>
+                    </div>
+                    <div
+                      className="text-center p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                      onClick={() => checkoutUrl && (window.location.href = checkoutUrl)}
+                    >
+                      <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto mb-3">
+                        <Shield className="w-6 h-6 text-amber-500" />
+                      </div>
+                      <p className="font-semibold text-foreground text-sm">Piggies Ultra</p>
+                      <p className="text-xs text-muted-foreground mt-1">Unlock premium features</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </main>
 
@@ -575,7 +765,7 @@ function HomePage() {
           onClick={() => setSelectedUser(null)}
         >
           <div
-            className="bg-card border-t sm:border border-border rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-hidden"
+            className="bg-card border-t sm:border border-border rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-hidden overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close button */}
@@ -588,23 +778,81 @@ function HomePage() {
               <X className="w-5 h-5 text-white" />
             </Button>
 
-            {/* Profile Image */}
+            {/* Profile Photo Gallery */}
             <div className="relative aspect-[4/5]">
-              {getProfileImage(selectedUser) ? (
-                <img
-                  src={getProfileImage(selectedUser)}
-                  alt={getDisplayName(selectedUser)}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full bg-muted flex items-center justify-center">
-                  <User className="w-24 h-24 text-muted-foreground" />
-                </div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
+              {(() => {
+                const photos = selectedUser.profile?.profilePhotoUrls || []
+                const currentPhoto = photos[currentPhotoIndex] || selectedUser.imageUrl
+                const hasMultiplePhotos = photos.length > 1
+
+                return (
+                  <>
+                    {currentPhoto ? (
+                      <img
+                        src={currentPhoto}
+                        alt={getDisplayName(selectedUser)}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                        <User className="w-24 h-24 text-muted-foreground" />
+                      </div>
+                    )}
+
+                    {/* Photo navigation buttons */}
+                    {hasMultiplePhotos && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full w-10 h-10"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setCurrentPhotoIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1))
+                          }}
+                        >
+                          <ChevronLeft className="w-6 h-6 text-white" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 rounded-full w-10 h-10"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setCurrentPhotoIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1))
+                          }}
+                        >
+                          <ChevronRight className="w-6 h-6 text-white" />
+                        </Button>
+                      </>
+                    )}
+
+                    {/* Photo indicators */}
+                    {hasMultiplePhotos && (
+                      <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        {photos.map((_, index) => (
+                          <button
+                            key={index}
+                            className={`h-1 rounded-full transition-all ${
+                              index === currentPhotoIndex
+                                ? 'w-6 bg-white'
+                                : 'w-1.5 bg-white/50 hover:bg-white/70'
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setCurrentPhotoIndex(index)
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+              <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent pointer-events-none" />
 
               {/* Online/Distance badge */}
-              <div className="absolute top-4 left-4 flex items-center gap-2">
+              <div className="absolute bottom-20 left-4 flex items-center gap-2">
                 {selectedUser.isOnline ? (
                   <Badge className="bg-online text-black font-bold">
                     <span className="w-2 h-2 bg-black/30 rounded-full mr-1.5" />
@@ -676,37 +924,6 @@ function HomePage() {
         </div>
       )}
 
-      {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-border lg:hidden z-40">
-        <div className="flex items-center justify-around h-16 px-4">
-          <Button variant="ghost" size="icon" className="text-primary">
-            <Grid3X3 className="w-6 h-6" />
-          </Button>
-          <Button variant="ghost" size="icon">
-            <Search className="w-6 h-6" />
-          </Button>
-          <Button size="icon" className="bg-primary glow-red -mt-6 w-14 h-14 rounded-full shadow-lg">
-            <Camera className="w-6 h-6" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="relative"
-            onClick={handleGoToMessages}
-          >
-            <MessageCircle className="w-6 h-6" />
-            {(unreadCount ?? 0) > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-            )}
-          </Button>
-          <Button variant="ghost" size="icon">
-            <User className="w-6 h-6" />
-          </Button>
-        </div>
-      </nav>
-
-      {/* Bottom padding for mobile nav */}
-      <div className="h-16 lg:hidden" />
     </div>
   )
 }

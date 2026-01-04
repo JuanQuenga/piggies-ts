@@ -8,6 +8,7 @@ export const syncUser = mutation({
     email: v.string(),
     name: v.string(),
     imageUrl: v.optional(v.string()),
+    referralCode: v.optional(v.string()), // Optional referral code for new signups
   },
   returns: v.id("users"),
   handler: async (ctx, args) => {
@@ -44,6 +45,28 @@ export const syncUser = mutation({
       userId,
     });
 
+    // Apply referral code if provided
+    if (args.referralCode) {
+      const referrer = await ctx.db
+        .query("users")
+        .withIndex("by_referralCode", (q) => q.eq("referralCode", args.referralCode!.toUpperCase()))
+        .unique();
+
+      if (referrer && referrer._id !== userId) {
+        // Create the referral record
+        await ctx.db.insert("referrals", {
+          referrerId: referrer._id,
+          referredUserId: userId,
+          referralCode: args.referralCode.toUpperCase(),
+          createdAt: Date.now(),
+          status: "pending",
+        });
+
+        // Update user's referredBy field
+        await ctx.db.patch(userId, { referredBy: referrer._id });
+      }
+    }
+
     return userId;
   },
 });
@@ -71,6 +94,20 @@ export const getCurrentUser = query({
       emailNotificationsEnabled: v.optional(v.boolean()),
       showOnlineStatus: v.optional(v.boolean()),
       locationSharingEnabled: v.optional(v.boolean()),
+      hideFromDiscovery: v.optional(v.boolean()),
+      // Referral fields
+      referralCode: v.optional(v.string()),
+      referredBy: v.optional(v.id("users")),
+      referralCredits: v.optional(v.number()),
+      referralUltraExpiresAt: v.optional(v.number()),
+      // Admin & moderation fields
+      isAdmin: v.optional(v.boolean()),
+      isBanned: v.optional(v.boolean()),
+      bannedAt: v.optional(v.number()),
+      bannedReason: v.optional(v.string()),
+      isSuspended: v.optional(v.boolean()),
+      suspendedUntil: v.optional(v.number()),
+      warningCount: v.optional(v.number()),
     }),
     v.null()
   ),
@@ -107,6 +144,20 @@ export const getUser = query({
       emailNotificationsEnabled: v.optional(v.boolean()),
       showOnlineStatus: v.optional(v.boolean()),
       locationSharingEnabled: v.optional(v.boolean()),
+      hideFromDiscovery: v.optional(v.boolean()),
+      // Referral fields
+      referralCode: v.optional(v.string()),
+      referredBy: v.optional(v.id("users")),
+      referralCredits: v.optional(v.number()),
+      referralUltraExpiresAt: v.optional(v.number()),
+      // Admin & moderation fields
+      isAdmin: v.optional(v.boolean()),
+      isBanned: v.optional(v.boolean()),
+      bannedAt: v.optional(v.number()),
+      bannedReason: v.optional(v.string()),
+      isSuspended: v.optional(v.boolean()),
+      suspendedUntil: v.optional(v.number()),
+      warningCount: v.optional(v.number()),
     }),
     v.null()
   ),
@@ -139,6 +190,7 @@ export const updateUserPreferences = mutation({
     emailNotificationsEnabled: v.optional(v.boolean()),
     showOnlineStatus: v.optional(v.boolean()),
     locationSharingEnabled: v.optional(v.boolean()),
+    hideFromDiscovery: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -313,7 +365,7 @@ export const linkPolarCustomer = mutation({
   },
 });
 
-// Check if user has Ultra subscription
+// Check if user has Ultra subscription (paid or referral-based)
 export const hasUltraSubscription = query({
   args: {
     userId: v.id("users"),
@@ -321,11 +373,23 @@ export const hasUltraSubscription = query({
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
-    return user?.subscriptionTier === "ultra" && user?.subscriptionStatus === "active";
+    if (!user) return false;
+
+    // Paid subscription takes priority
+    if (user.subscriptionTier === "ultra" && user.subscriptionStatus === "active") {
+      return true;
+    }
+
+    // Fallback to referral-based Ultra
+    if (user.referralUltraExpiresAt && user.referralUltraExpiresAt > Date.now()) {
+      return true;
+    }
+
+    return false;
   },
 });
 
-// Get nearby users for discovery feed (excludes current user)
+// Get nearby users for discovery feed
 export const getNearbyUsers = query({
   args: {
     currentUserId: v.id("users"),
@@ -335,6 +399,7 @@ export const getNearbyUsers = query({
     minAge: v.optional(v.number()),
     maxAge: v.optional(v.number()),
     interests: v.optional(v.array(v.string())),
+    includeSelf: v.optional(v.boolean()),
   },
   returns: v.array(
     v.object({
@@ -343,6 +408,7 @@ export const getNearbyUsers = query({
       imageUrl: v.optional(v.string()),
       isOnline: v.optional(v.boolean()),
       lastActive: v.optional(v.number()),
+      isSelf: v.optional(v.boolean()),
       profile: v.union(
         v.object({
           displayName: v.optional(v.string()),
@@ -361,10 +427,31 @@ export const getNearbyUsers = query({
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50;
 
-    // Get all users except current user
+    // Get all users
     const users = await ctx.db.query("users").collect();
 
-    let filteredUsers = users.filter((u) => u._id !== args.currentUserId);
+    // Filter users: exclude current user unless includeSelf is true
+    // Also filter out users who have hideFromDiscovery enabled (except self)
+    // Also filter out banned and suspended users
+    let filteredUsers = users.filter((u) => {
+      // Always include self if includeSelf is true
+      if (u._id === args.currentUserId) {
+        return args.includeSelf === true;
+      }
+      // Exclude banned users
+      if (u.isBanned === true) {
+        return false;
+      }
+      // Exclude suspended users (if suspension hasn't expired)
+      if (u.isSuspended === true && u.suspendedUntil && u.suspendedUntil > Date.now()) {
+        return false;
+      }
+      // Exclude users who have hidden themselves from discovery
+      if (u.hideFromDiscovery === true) {
+        return false;
+      }
+      return true;
+    });
 
     // Filter to online users only if requested
     if (args.onlineOnly) {
@@ -394,6 +481,7 @@ export const getNearbyUsers = query({
           imageUrl: user.imageUrl,
           isOnline: user.isOnline,
           lastActive: user.lastActive,
+          isSelf: user._id === args.currentUserId,
           profile: profile
             ? {
                 displayName: profile.displayName,

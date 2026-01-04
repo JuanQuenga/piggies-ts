@@ -29,10 +29,28 @@ export default defineSchema({
     // Privacy preferences
     showOnlineStatus: v.optional(v.boolean()),
     locationSharingEnabled: v.optional(v.boolean()),
+    hideFromDiscovery: v.optional(v.boolean()),
+
+    // Referral system fields
+    referralCode: v.optional(v.string()),           // Unique 8-char referral code
+    referredBy: v.optional(v.id("users")),          // Who referred this user
+    referralCredits: v.optional(v.number()),        // Total successful referrals
+    referralUltraExpiresAt: v.optional(v.number()), // When referral-based Ultra expires
+
+    // Admin & moderation fields
+    isAdmin: v.optional(v.boolean()),               // Admin access
+    isBanned: v.optional(v.boolean()),              // Account banned
+    bannedAt: v.optional(v.number()),               // When banned
+    bannedReason: v.optional(v.string()),           // Ban reason
+    isSuspended: v.optional(v.boolean()),           // Temporarily suspended
+    suspendedUntil: v.optional(v.number()),         // Suspension end time
+    warningCount: v.optional(v.number()),           // Number of warnings issued
   })
     .index("by_email", ["email"])
     .index("by_workosId", ["workosId"])
-    .index("by_polarCustomerId", ["polarCustomerId"]),
+    .index("by_polarCustomerId", ["polarCustomerId"])
+    .index("by_referralCode", ["referralCode"])
+    .index("by_isAdmin", ["isAdmin"]),
 
   // ============================================================================
   // PROFILES TABLE
@@ -114,11 +132,22 @@ export default defineSchema({
     reason: v.string(),
     details: v.optional(v.string()),
     reportedAt: v.number(),
-    status: v.union(v.literal("pending"), v.literal("reviewed"), v.literal("resolved")),
+    status: v.union(v.literal("pending"), v.literal("reviewed"), v.literal("resolved"), v.literal("dismissed")),
+    // Admin review fields
+    reviewedBy: v.optional(v.id("users")),   // Admin who reviewed
+    reviewedAt: v.optional(v.number()),      // When reviewed
+    adminNotes: v.optional(v.string()),      // Admin notes/action taken
+    actionTaken: v.optional(v.union(
+      v.literal("none"),
+      v.literal("warning"),
+      v.literal("suspension"),
+      v.literal("ban")
+    )),
   })
     .index("by_reporter", ["reporterId"])
     .index("by_reported", ["reportedId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_reportedAt", ["reportedAt"]),
 
   // ============================================================================
   // FAVORITE USERS TABLE
@@ -160,6 +189,38 @@ export default defineSchema({
     .index("by_granted", ["grantedUserId"])
     .index("by_owner_granted", ["ownerUserId", "grantedUserId"])
     .index("by_conversation", ["conversationId"]),
+
+  // ============================================================================
+  // REFERRALS TABLE
+  // ============================================================================
+  referrals: defineTable({
+    referrerId: v.id("users"),           // User who shared the referral code
+    referredUserId: v.id("users"),       // User who signed up with the code
+    referralCode: v.string(),            // The code used
+    createdAt: v.number(),               // When referral was created (signup time)
+    activatedAt: v.optional(v.number()), // When the 7-day threshold was met
+    status: v.union(
+      v.literal("pending"),              // Waiting for 7-day activity
+      v.literal("activated"),            // Successfully completed 7 days active
+      v.literal("expired")               // User never became active
+    ),
+  })
+    .index("by_referrer", ["referrerId"])
+    .index("by_referrer_status", ["referrerId", "status"])
+    .index("by_referredUser", ["referredUserId"])
+    .index("by_status", ["status"]),
+
+  // ============================================================================
+  // REFERRAL REWARDS TABLE (Audit Trail)
+  // ============================================================================
+  referralRewards: defineTable({
+    userId: v.id("users"),               // User who earned the reward
+    referralId: v.id("referrals"),       // Which referral triggered this reward
+    monthsGranted: v.number(),           // Always 1 month per 3 referrals
+    grantedAt: v.number(),               // Timestamp when reward was granted
+    expiresAt: v.number(),               // When this reward period expires
+  })
+    .index("by_userId", ["userId"]),
 });
 
 
