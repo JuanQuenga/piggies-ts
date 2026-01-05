@@ -12,6 +12,7 @@ import type * as admin from "../admin.js";
 import type * as albums from "../albums.js";
 import type * as crons from "../crons.js";
 import type * as dev from "../dev.js";
+import type * as lookingNow from "../lookingNow.js";
 import type * as messages from "../messages.js";
 import type * as referrals from "../referrals.js";
 import type * as users from "../users.js";
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   albums: typeof albums;
   crons: typeof crons;
   dev: typeof dev;
+  lookingNow: typeof lookingNow;
   messages: typeof messages;
   referrals: typeof referrals;
   users: typeof users;

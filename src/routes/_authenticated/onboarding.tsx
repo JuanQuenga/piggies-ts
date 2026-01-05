@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
-import { useMutation } from 'convex/react'
+import { useState, useRef } from 'react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { Button } from '@/components/ui/button'
@@ -17,8 +17,12 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  ImagePlus,
+  Trash2,
+  Loader2,
 } from 'lucide-react'
 import { INTEREST_CATEGORIES, type InterestCategory } from '@/lib/interests'
+import { Id } from '../../../convex/_generated/dataModel'
 
 export const Route = createFileRoute('/_authenticated/onboarding')({
   component: OnboardingPage,
@@ -31,13 +35,26 @@ const LOOKING_FOR_OPTIONS = [
   { id: 'open', label: 'Open to Anything', icon: '✨', description: 'See where things go' },
 ]
 
+const MAX_PHOTOS = 6
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+
 function OnboardingPage() {
   const navigate = useNavigate()
   const { user: convexUser } = useCurrentUser()
   const updateProfile = useMutation(api.users.updateProfile)
-  
+  const generateUploadUrl = useMutation(api.messages.generateUploadUrl)
+  const addProfilePhoto = useMutation(api.users.addProfilePhoto)
+  const removeProfilePhoto = useMutation(api.users.removeProfilePhoto)
+  const profilePhotos = useQuery(
+    api.users.getProfilePhotos,
+    convexUser?._id ? { userId: convexUser._id } : 'skip'
+  )
+
   const [step, setStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState<Id<"_storage"> | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Form state
   const [displayName, setDisplayName] = useState('')
@@ -47,7 +64,8 @@ function OnboardingPage() {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([])
   const [expandedCategories, setExpandedCategories] = useState<Set<InterestCategory>>(new Set(['hobbies']))
 
-  const totalSteps = 4
+  const totalSteps = 5
+  const photoCount = profilePhotos?.length ?? 0
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests(prev =>
@@ -69,15 +87,68 @@ function OnboardingPage() {
     })
   }
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !convexUser?._id) return
+
+    // Reset input so the same file can be selected again
+    e.target.value = ''
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('File too large. Max size is 5MB.')
+      return
+    }
+
+    setIsUploadingPhoto(true)
+    try {
+      const uploadUrl = await generateUploadUrl()
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      })
+
+      if (!response.ok) throw new Error('Upload failed')
+
+      const { storageId } = await response.json()
+      await addProfilePhoto({ userId: convexUser._id, storageId })
+      toast.success('Photo added!')
+    } catch {
+      toast.error('Failed to upload photo')
+    } finally {
+      setIsUploadingPhoto(false)
+    }
+  }
+
+  const handleDeletePhoto = async (storageId: Id<"_storage">) => {
+    if (!convexUser?._id) return
+
+    setIsDeletingPhoto(storageId)
+    try {
+      await removeProfilePhoto({ userId: convexUser._id, storageId })
+      toast.success('Photo removed')
+    } catch {
+      toast.error('Failed to remove photo')
+    } finally {
+      setIsDeletingPhoto(null)
+    }
+  }
+
   const canProceed = () => {
     switch (step) {
-      case 1: {
+      case 1: return true // Photos are optional, can always skip
+      case 2: {
         const ageNum = parseInt(age, 10)
         return displayName.trim().length >= 2 && age.trim() !== '' && !isNaN(ageNum) && ageNum >= 18
       }
-      case 2: return lookingFor !== ''
-      case 3: return selectedInterests.length >= 3
-      case 4: return bio.trim().length >= 10
+      case 3: return lookingFor !== ''
+      case 4: return selectedInterests.length >= 3
+      case 5: return bio.trim().length >= 10
       default: return false
     }
   }
@@ -154,8 +225,92 @@ function OnboardingPage() {
 
       {/* Content */}
       <main className="relative z-10 flex-1 px-6 pb-32">
-        {/* Step 1: Basic Info */}
+        {/* Hidden file input for photo upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* Step 1: Photos */}
         {step === 1 && (
+          <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="mb-8">
+              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
+                <Camera className="w-8 h-8 text-primary" />
+              </div>
+              <h1 className="text-3xl font-black mb-2">Add your photos</h1>
+              <p className="text-muted-foreground">
+                Show off your best self! You can skip this and add photos later.
+              </p>
+            </div>
+
+            {/* Photo grid */}
+            <div className="grid grid-cols-3 gap-3">
+              {Array.from({ length: MAX_PHOTOS }).map((_, index) => {
+                const photo = profilePhotos?.[index]
+                return (
+                  <div
+                    key={index}
+                    className={`relative aspect-square rounded-xl overflow-hidden ${
+                      photo ? 'bg-muted' : 'border-2 border-dashed border-border'
+                    }`}
+                  >
+                    {photo ? (
+                      <>
+                        <img
+                          src={photo.url ?? ''}
+                          alt={`Photo ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {index === 0 && (
+                          <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-0.5 rounded-full text-xs font-medium">
+                            Primary
+                          </div>
+                        )}
+                        <button
+                          onClick={() => handleDeletePhoto(photo.storageId)}
+                          disabled={isDeletingPhoto === photo.storageId}
+                          className="absolute top-2 right-2 w-8 h-8 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/90 transition-colors"
+                        >
+                          {isDeletingPhoto === photo.storageId ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingPhoto || photoCount >= MAX_PHOTOS}
+                        className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:border-foreground/50 transition-colors disabled:opacity-50"
+                      >
+                        {isUploadingPhoto && index === photoCount ? (
+                          <Loader2 className="w-8 h-8 animate-spin" />
+                        ) : (
+                          <>
+                            <ImagePlus className="w-8 h-8" />
+                            <span className="text-xs">Add Photo</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <p className="text-sm text-muted-foreground mt-4 text-center">
+              {photoCount} / {MAX_PHOTOS} photos • First photo is your profile picture
+            </p>
+          </div>
+        )}
+
+        {/* Step 2: Basic Info */}
+        {step === 2 && (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <div className="mb-8">
               <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
@@ -199,8 +354,8 @@ function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 2: Looking For */}
-        {step === 2 && (
+        {/* Step 3: Looking For */}
+        {step === 3 && (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <div className="mb-8">
               <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
@@ -216,8 +371,8 @@ function OnboardingPage() {
                   key={option.id}
                   onClick={() => setLookingFor(option.id)}
                   className={`w-full p-4 rounded-2xl border-2 transition-all duration-200 text-left flex items-center gap-4 ${
-                    lookingFor === option.id 
-                      ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20' 
+                    lookingFor === option.id
+                      ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20'
                       : 'border-border bg-card hover:border-primary/50'
                   }`}
                 >
@@ -237,8 +392,8 @@ function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 3: Interests */}
-        {step === 3 && (
+        {/* Step 4: Interests */}
+        {step === 4 && (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <div className="mb-8">
               <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
@@ -307,12 +462,12 @@ function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 4: Bio */}
-        {step === 4 && (
+        {/* Step 5: Bio */}
+        {step === 5 && (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <div className="mb-8">
               <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-                <Camera className="w-8 h-8 text-primary" />
+                <User className="w-8 h-8 text-primary" />
               </div>
               <h1 className="text-3xl font-black mb-2">Write your bio</h1>
               <p className="text-muted-foreground">
@@ -338,9 +493,17 @@ function OnboardingPage() {
             <div className="mt-8 p-4 bg-card rounded-2xl border border-border">
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Profile Preview</p>
               <div className="flex items-start gap-3">
-                <div className="w-14 h-14 bg-primary/20 rounded-xl flex items-center justify-center shrink-0">
-                  <User className="w-7 h-7 text-primary" />
-                </div>
+                {profilePhotos && profilePhotos.length > 0 ? (
+                  <img
+                    src={profilePhotos[0].url ?? ''}
+                    alt="Profile"
+                    className="w-14 h-14 rounded-xl object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 bg-primary/20 rounded-xl flex items-center justify-center shrink-0">
+                    <User className="w-7 h-7 text-primary" />
+                  </div>
+                )}
                 <div className="min-w-0">
                   <p className="font-bold">{displayName || 'Your Name'}, {age || '??'}</p>
                   <p className="text-sm text-muted-foreground truncate">

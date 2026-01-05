@@ -8,11 +8,9 @@ import { useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { toast } from 'sonner'
 import {
-  ArrowLeft,
   Bell,
   Shield,
   Eye,
-  EyeOff,
   MapPin,
   Moon,
   Smartphone,
@@ -320,18 +318,9 @@ function SettingsPage() {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
       </div>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border">
-        <div className="flex items-center justify-between h-14 px-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/home' })}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="font-bold text-lg">Settings</h1>
-          <div className="w-10" />
-        </div>
-      </header>
-
       <main className="relative z-10 max-w-2xl mx-auto px-4 py-6 pb-32">
+        {/* Page Title */}
+        <h1 className="font-bold text-2xl mb-6">Settings</h1>
         {/* Profile Card */}
         <section className="mb-8 p-4 bg-card rounded-2xl border border-border">
           <div className="flex items-center gap-4">

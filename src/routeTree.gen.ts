@@ -17,11 +17,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPortalRouteImport } from './routes/api/portal'
 import { Route as ApiCheckoutRouteImport } from './routes/api/checkout'
 import { Route as AuthenticatedWhoViewedMeRouteImport } from './routes/_authenticated/who-viewed-me'
+import { Route as AuthenticatedWavesRouteImport } from './routes/_authenticated/waves'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedReferralsRouteImport } from './routes/_authenticated/referrals'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
+import { Route as AuthenticatedLookingNowRouteImport } from './routes/_authenticated/looking-now'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedAlbumRouteImport } from './routes/_authenticated/album'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -71,6 +73,11 @@ const AuthenticatedWhoViewedMeRoute =
     path: '/who-viewed-me',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedWavesRoute = AuthenticatedWavesRouteImport.update({
+  id: '/waves',
+  path: '/waves',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -94,6 +101,11 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
 const AuthenticatedMessagesRoute = AuthenticatedMessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLookingNowRoute = AuthenticatedLookingNowRouteImport.update({
+  id: '/looking-now',
+  path: '/looking-now',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
@@ -146,11 +158,13 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/album': typeof AuthenticatedAlbumRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/looking-now': typeof AuthenticatedLookingNowRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/referrals': typeof AuthenticatedReferralsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/waves': typeof AuthenticatedWavesRoute
   '/who-viewed-me': typeof AuthenticatedWhoViewedMeRoute
   '/api/checkout': typeof ApiCheckoutRoute
   '/api/portal': typeof ApiPortalRoute
@@ -167,11 +181,13 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/album': typeof AuthenticatedAlbumRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/looking-now': typeof AuthenticatedLookingNowRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/referrals': typeof AuthenticatedReferralsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/waves': typeof AuthenticatedWavesRoute
   '/who-viewed-me': typeof AuthenticatedWhoViewedMeRoute
   '/api/checkout': typeof ApiCheckoutRoute
   '/api/portal': typeof ApiPortalRoute
@@ -191,11 +207,13 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/album': typeof AuthenticatedAlbumRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
+  '/_authenticated/looking-now': typeof AuthenticatedLookingNowRoute
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/referrals': typeof AuthenticatedReferralsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/waves': typeof AuthenticatedWavesRoute
   '/_authenticated/who-viewed-me': typeof AuthenticatedWhoViewedMeRoute
   '/api/checkout': typeof ApiCheckoutRoute
   '/api/portal': typeof ApiPortalRoute
@@ -215,11 +233,13 @@ export interface FileRouteTypes {
     | '/admin'
     | '/album'
     | '/home'
+    | '/looking-now'
     | '/messages'
     | '/onboarding'
     | '/profile'
     | '/referrals'
     | '/settings'
+    | '/waves'
     | '/who-viewed-me'
     | '/api/checkout'
     | '/api/portal'
@@ -236,11 +256,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/album'
     | '/home'
+    | '/looking-now'
     | '/messages'
     | '/onboarding'
     | '/profile'
     | '/referrals'
     | '/settings'
+    | '/waves'
     | '/who-viewed-me'
     | '/api/checkout'
     | '/api/portal'
@@ -259,11 +281,13 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/album'
     | '/_authenticated/home'
+    | '/_authenticated/looking-now'
     | '/_authenticated/messages'
     | '/_authenticated/onboarding'
     | '/_authenticated/profile'
     | '/_authenticated/referrals'
     | '/_authenticated/settings'
+    | '/_authenticated/waves'
     | '/_authenticated/who-viewed-me'
     | '/api/checkout'
     | '/api/portal'
@@ -344,6 +368,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWhoViewedMeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/waves': {
+      id: '/_authenticated/waves'
+      path: '/waves'
+      fullPath: '/waves'
+      preLoaderRoute: typeof AuthenticatedWavesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -377,6 +408,13 @@ declare module '@tanstack/react-router' {
       path: '/messages'
       fullPath: '/messages'
       preLoaderRoute: typeof AuthenticatedMessagesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/looking-now': {
+      id: '/_authenticated/looking-now'
+      path: '/looking-now'
+      fullPath: '/looking-now'
+      preLoaderRoute: typeof AuthenticatedLookingNowRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/home': {
@@ -457,11 +495,13 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedAlbumRoute: typeof AuthenticatedAlbumRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
+  AuthenticatedLookingNowRoute: typeof AuthenticatedLookingNowRoute
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedReferralsRoute: typeof AuthenticatedReferralsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedWavesRoute: typeof AuthenticatedWavesRoute
   AuthenticatedWhoViewedMeRoute: typeof AuthenticatedWhoViewedMeRoute
 }
 
@@ -469,11 +509,13 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedAlbumRoute: AuthenticatedAlbumRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
+  AuthenticatedLookingNowRoute: AuthenticatedLookingNowRoute,
   AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedReferralsRoute: AuthenticatedReferralsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedWavesRoute: AuthenticatedWavesRoute,
   AuthenticatedWhoViewedMeRoute: AuthenticatedWhoViewedMeRoute,
 }
 

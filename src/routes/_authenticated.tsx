@@ -5,6 +5,7 @@ import { api } from '../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useEffect } from 'react'
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav'
+import { AppHeader } from '@/components/navigation/AppHeader'
 import { Ban, Clock, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -79,13 +80,16 @@ function AuthenticatedLayout() {
     return <SuspendedScreen suspendedUntil={convexUser.suspendedUntil} />
   }
 
-  // Hide bottom nav on certain pages
-  const hideBottomNav = location.pathname === '/onboarding' || location.pathname.startsWith('/admin')
+  // Hide nav elements on certain pages
+  const hideNav = location.pathname === '/onboarding' || location.pathname.startsWith('/admin')
+  // Home and messages pages have their own headers
+  const hideHeader = hideNav || location.pathname === '/home' || location.pathname === '/messages'
 
   return (
     <>
+      {!hideHeader && <AppHeader />}
       <Outlet context={{ user }} />
-      {!hideBottomNav && <MobileBottomNav />}
+      {!hideNav && <MobileBottomNav />}
     </>
   )
 }

@@ -190,6 +190,42 @@
     animation: online-pulse 2s infinite;
 }
 
+/* Wave hand animation */
+@keyframes wave-hand {
+    0% { transform: rotate(0deg); }
+    10% { transform: rotate(14deg); }
+    20% { transform: rotate(-8deg); }
+    30% { transform: rotate(14deg); }
+    40% { transform: rotate(-4deg); }
+    50% { transform: rotate(10deg); }
+    60% { transform: rotate(0deg); }
+    100% { transform: rotate(0deg); }
+}
+
+@keyframes wave-success {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.wave-button-waving .wave-icon {
+    animation: wave-hand 0.8s ease-in-out;
+    transform-origin: 70% 70%;
+}
+
+.wave-button-success {
+    @apply bg-green-500 border-green-500 text-white;
+    animation: wave-success 0.3s ease-out;
+}
+
+.wave-button-success .wave-icon {
+    display: none;
+}
+
+.wave-button-success .check-icon {
+    display: block;
+}
+
 /* Glow effect for CTAs */
 .glow-red {
     box-shadow: 0 0 20px rgba(241, 26, 35, 0.5), 0 0 40px rgba(241, 26, 35, 0.3);
@@ -216,4 +252,42 @@
 
 ::-webkit-scrollbar-thumb:hover {
     background: oklch(0.35 0 0);
+}
+
+/* Toast/Sonner styling */
+[data-sonner-toaster] {
+    --normal-bg: oklch(0.14 0 0);
+    --normal-border: oklch(0.25 0 0);
+    --normal-text: oklch(0.98 0 0);
+    --success-bg: oklch(0.14 0 0);
+    --success-border: oklch(0.72 0.2 145);
+    --success-text: oklch(0.98 0 0);
+    --error-bg: oklch(0.14 0 0);
+    --error-border: oklch(0.56 0.24 25);
+    --error-text: oklch(0.98 0 0);
+    --info-bg: oklch(0.14 0 0);
+    --info-border: oklch(0.65 0.2 260);
+    --info-text: oklch(0.98 0 0);
+    font-family: 'Outfit Variable', system-ui, sans-serif !important;
+}
+
+[data-sonner-toast] {
+    --toast-svg-margin-start: -2px;
+    --toast-svg-margin-end: 8px;
+}
+
+[data-sonner-toast][data-type="success"] [data-icon] svg {
+    color: oklch(0.72 0.2 145);
+}
+
+[data-sonner-toast][data-type="error"] [data-icon] svg {
+    color: oklch(0.65 0.24 25);
+}
+
+[data-sonner-toast][data-type="info"] [data-icon] svg {
+    color: oklch(0.65 0.2 260);
+}
+
+[data-sonner-toast][data-type="warning"] [data-icon] svg {
+    color: oklch(0.75 0.18 75);
 }

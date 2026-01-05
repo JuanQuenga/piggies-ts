@@ -91,8 +91,26 @@ function RootComponent() {
         position="top-center"
         richColors
         closeButton
+        gap={8}
         toastOptions={{
           className: 'font-sans',
+          style: {
+            background: 'oklch(0.14 0 0)',
+            border: '1px solid oklch(0.25 0 0)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+          },
+          classNames: {
+            toast: 'group',
+            title: 'text-sm font-semibold text-foreground',
+            description: 'text-sm text-muted-foreground',
+            success: 'border-l-4 !border-l-green-500',
+            error: 'border-l-4 !border-l-red-500',
+            info: 'border-l-4 !border-l-blue-500',
+            warning: 'border-l-4 !border-l-amber-500',
+            closeButton: 'bg-transparent hover:bg-white/10 border-0 text-muted-foreground hover:text-foreground',
+          },
         }}
       />
     </AuthKitProvider>

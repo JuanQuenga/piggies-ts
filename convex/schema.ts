@@ -221,6 +221,23 @@ export default defineSchema({
     expiresAt: v.number(),               // When this reward period expires
   })
     .index("by_userId", ["userId"]),
+
+  // ============================================================================
+  // LOOKING NOW POSTS TABLE
+  // ============================================================================
+  lookingNowPosts: defineTable({
+    userId: v.id("users"),               // User who created the post
+    message: v.string(),                 // What they're looking for right now
+    latitude: v.optional(v.number()),    // Location coordinates
+    longitude: v.optional(v.number()),   // Location coordinates
+    locationName: v.optional(v.string()),// Display name for location (e.g., "Downtown")
+    createdAt: v.number(),               // When the post was created
+    expiresAt: v.number(),               // When the post expires (auto-delete after X hours)
+    isActive: v.boolean(),               // Whether the post is still active
+  })
+    .index("by_userId", ["userId"])
+    .index("by_createdAt", ["createdAt"])
+    .index("by_isActive_createdAt", ["isActive", "createdAt"]),
 });
 
 

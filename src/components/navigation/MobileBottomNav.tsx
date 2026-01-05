@@ -3,7 +3,7 @@ import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { Button } from '@/components/ui/button'
-import { Grid3X3, MessageCircle, User, Flame } from 'lucide-react'
+import { Home, MessageCircle, User, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface NavItem {
@@ -26,14 +26,14 @@ export function MobileBottomNav() {
 
   const navItems: NavItem[] = [
     {
-      icon: Grid3X3,
+      icon: Home,
       label: 'Browse',
       path: '/home',
     },
     {
-      icon: Flame,
-      label: 'Hot',
-      path: '/home', // Could be a separate trending page in the future
+      icon: MapPin,
+      label: 'Looking',
+      path: '/looking-now',
     },
     {
       icon: MessageCircle,
