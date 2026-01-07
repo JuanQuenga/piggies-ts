@@ -18,6 +18,7 @@ export const Route = createFileRoute('/api/webhook/polar')({
           if (product.id === ultraProductId) {
             await convex.mutation(api.users.updateSubscription, {
               polarCustomerId: customer.id,
+              customerEmail: customer.email,
               subscriptionTier: 'ultra',
               subscriptionStatus: 'active',
               polarSubscriptionId: payload.data.id,
@@ -29,6 +30,7 @@ export const Route = createFileRoute('/api/webhook/polar')({
           const { customer } = payload.data
           await convex.mutation(api.users.updateSubscription, {
             polarCustomerId: customer.id,
+            customerEmail: customer.email,
             subscriptionTier: 'free',
             subscriptionStatus: 'canceled',
             polarSubscriptionId: payload.data.id,
@@ -39,6 +41,7 @@ export const Route = createFileRoute('/api/webhook/polar')({
           const { customer } = payload.data
           await convex.mutation(api.users.updateSubscription, {
             polarCustomerId: customer.id,
+            customerEmail: customer.email,
             subscriptionTier: 'free',
             subscriptionStatus: 'revoked',
             polarSubscriptionId: undefined,
@@ -57,4 +60,5 @@ export const Route = createFileRoute('/api/webhook/polar')({
     },
   },
 })
+
 

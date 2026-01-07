@@ -26,6 +26,7 @@ import {
   ImageIcon,
   Users,
   Gift,
+  User,
 } from 'lucide-react'
 import { useReferrals } from '@/hooks/useReferrals'
 
@@ -157,6 +158,13 @@ function SettingsPage() {
     {
       title: 'Account',
       items: [
+        {
+          icon: <User className="w-5 h-5" />,
+          label: 'Edit Profile',
+          description: 'Update your profile information',
+          action: () => navigate({ to: '/profile' }),
+          rightElement: <ChevronRight className="w-5 h-5 text-muted-foreground" />,
+        },
         {
           icon: <CreditCard className="w-5 h-5" />,
           label: isUltra ? 'Manage Subscription' : 'Upgrade to Ultra',

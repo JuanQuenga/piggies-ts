@@ -561,4 +561,39 @@ export const getUserSentMedia = query({
   },
 });
 
+// Delete a sent media message
+export const deleteUserSentMedia = mutation({
+  args: {
+    userId: v.id("users"),
+    messageId: v.id("messages"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Get the message
+    const message = await ctx.db.get(args.messageId);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+
+    // Verify ownership
+    if (message.senderId !== args.userId) {
+      throw new Error("You can only delete your own messages");
+    }
+
+    // Verify it's a media message
+    if (message.format !== "image" && message.format !== "video") {
+      throw new Error("Can only delete media messages");
+    }
+
+    // Delete from storage if exists
+    if (message.storageId) {
+      await ctx.storage.delete(message.storageId);
+    }
+
+    // Delete the message record
+    await ctx.db.delete(args.messageId);
+
+    return null;
+  },
+});
 

@@ -313,23 +313,36 @@ export const searchUsers = query({
 export const updateSubscription = mutation({
   args: {
     polarCustomerId: v.string(),
+    customerEmail: v.optional(v.string()),
     subscriptionTier: v.union(v.literal("free"), v.literal("pro"), v.literal("ultra")),
     subscriptionStatus: v.union(v.literal("active"), v.literal("canceled"), v.literal("revoked")),
     polarSubscriptionId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await ctx.db
+    // First try to find user by polarCustomerId
+    let user = await ctx.db
       .query("users")
       .withIndex("by_polarCustomerId", (q) => q.eq("polarCustomerId", args.polarCustomerId))
       .unique();
 
+    // Fallback to email lookup if polarCustomerId not linked yet
+    const customerEmail = args.customerEmail;
+    if (!user && customerEmail) {
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", customerEmail))
+        .unique();
+    }
+
     if (!user) {
-      console.warn(`No user found with polarCustomerId: ${args.polarCustomerId}`);
+      console.warn(`No user found with polarCustomerId: ${args.polarCustomerId} or email: ${args.customerEmail}`);
       return null;
     }
 
+    // Update subscription and ensure polarCustomerId is linked
     await ctx.db.patch(user._id, {
+      polarCustomerId: args.polarCustomerId,
       subscriptionTier: args.subscriptionTier,
       subscriptionStatus: args.subscriptionStatus,
       polarSubscriptionId: args.polarSubscriptionId,
