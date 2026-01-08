@@ -33,6 +33,16 @@ export function AppHeader() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  // Get location display text from localStorage (for mobile header)
+  const getLocationDisplayText = () => {
+    if (typeof window === 'undefined') return 'Nearby'
+    const locationType = localStorage.getItem('piggies-location-type')
+    if (locationType === 'custom') {
+      return localStorage.getItem('piggies-custom-location') || 'Set Location'
+    }
+    return localStorage.getItem('piggies-nearby-location') || 'Nearby'
+  }
+
   // Get unread message count
   const unreadCount = useQuery(
     api.messages.getUnreadCount,
@@ -58,17 +68,32 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border">
       <div className="flex items-center justify-between h-14 px-4">
-        {/* Logo */}
-        <Link to="/home" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <img
-              src="/pig-snout.svg"
-              alt="Piggies"
-              className="w-5 h-5 brightness-0 invert"
-            />
-          </div>
-          <span className="text-lg font-bold hidden sm:block">Piggies</span>
-        </Link>
+        {/* Logo + Mobile Location */}
+        <div className="flex items-center gap-2">
+          <Link to="/home" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <img
+                src="/pig-snout.svg"
+                alt="Piggies"
+                className="w-5 h-5 brightness-0 invert"
+              />
+            </div>
+            <span className="text-lg font-bold hidden sm:block">Piggies</span>
+          </Link>
+
+          {/* Mobile Location Button - only on home page */}
+          {location.pathname === '/home' && (
+            <button
+              onClick={() => navigate({ to: '/home', search: { openLocation: true } })}
+              className="flex lg:hidden items-center gap-1.5 bg-card border border-border rounded-full px-2.5 py-1 hover:bg-accent transition-colors"
+            >
+              <MapPin className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-medium truncate max-w-[80px]">
+                {getLocationDisplayText()}
+              </span>
+            </button>
+          )}
+        </div>
 
         {/* Desktop Navigation - hidden on mobile */}
         <nav className="hidden lg:flex items-center gap-1">

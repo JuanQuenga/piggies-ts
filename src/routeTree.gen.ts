@@ -31,6 +31,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as ApiWebhookPolarRouteImport } from './routes/api/webhook/polar'
 import { Route as ApiAuthCallbackRouteImport } from './routes/api/auth/callback'
+import { Route as AuthenticatedUserUserIdRouteImport } from './routes/_authenticated/user.$userId'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin/reports'
 
@@ -144,6 +145,11 @@ const ApiAuthCallbackRoute = ApiAuthCallbackRouteImport.update({
   path: '/api/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedUserUserIdRoute = AuthenticatedUserUserIdRouteImport.update({
+  id: '/user/$userId',
+  path: '/user/$userId',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/api/portal': typeof ApiPortalRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/user/$userId': typeof AuthenticatedUserUserIdRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
   '/api/webhook/polar': typeof ApiWebhookPolarRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/api/portal': typeof ApiPortalRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/user/$userId': typeof AuthenticatedUserUserIdRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
   '/api/webhook/polar': typeof ApiWebhookPolarRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -228,6 +236,7 @@ export interface FileRoutesById {
   '/api/portal': typeof ApiPortalRoute
   '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/_authenticated/user/$userId': typeof AuthenticatedUserUserIdRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
   '/api/webhook/polar': typeof ApiWebhookPolarRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -255,6 +264,7 @@ export interface FileRouteTypes {
     | '/api/portal'
     | '/admin/reports'
     | '/admin/users'
+    | '/user/$userId'
     | '/api/auth/callback'
     | '/api/webhook/polar'
     | '/admin/'
@@ -279,6 +289,7 @@ export interface FileRouteTypes {
     | '/api/portal'
     | '/admin/reports'
     | '/admin/users'
+    | '/user/$userId'
     | '/api/auth/callback'
     | '/api/webhook/polar'
     | '/admin'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/api/portal'
     | '/_authenticated/admin/reports'
     | '/_authenticated/admin/users'
+    | '/_authenticated/user/$userId'
     | '/api/auth/callback'
     | '/api/webhook/polar'
     | '/_authenticated/admin/'
@@ -478,6 +490,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/user/$userId': {
+      id: '/_authenticated/user/$userId'
+      path: '/user/$userId'
+      fullPath: '/user/$userId'
+      preLoaderRoute: typeof AuthenticatedUserUserIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
       path: '/users'
@@ -523,6 +542,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedWavesRoute: typeof AuthenticatedWavesRoute
   AuthenticatedWhoViewedMeRoute: typeof AuthenticatedWhoViewedMeRoute
+  AuthenticatedUserUserIdRoute: typeof AuthenticatedUserUserIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -538,6 +558,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedWavesRoute: AuthenticatedWavesRoute,
   AuthenticatedWhoViewedMeRoute: AuthenticatedWhoViewedMeRoute,
+  AuthenticatedUserUserIdRoute: AuthenticatedUserUserIdRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

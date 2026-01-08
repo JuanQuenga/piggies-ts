@@ -59,7 +59,7 @@ function MessagesPage() {
   if (isMobileView) {
     if (selectedConversationId) {
       return (
-        <div className="min-h-screen bg-background flex flex-col">
+        <div className="h-[calc(100vh-3.5rem)] bg-background flex flex-col overflow-hidden">
           <div className="flex-1 overflow-hidden">
             <ChatView
               conversationId={selectedConversationId}
@@ -72,7 +72,7 @@ function MessagesPage() {
     }
 
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="h-[calc(100vh-3.5rem)] bg-background flex flex-col overflow-hidden">
         <div className="flex-1 overflow-hidden">
           <ConversationsList
             userId={user._id}
@@ -86,7 +86,7 @@ function MessagesPage() {
 
   // Desktop: Side-by-side layout
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-[calc(100vh-3.5rem)] bg-background flex flex-col overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
         {/* Conversations sidebar */}
         <div className="w-80 xl:w-96 border-r border-border shrink-0 overflow-hidden">

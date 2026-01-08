@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
@@ -46,8 +46,15 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 
+type HomeSearch = {
+  openLocation?: boolean
+}
+
 export const Route = createFileRoute('/_authenticated/home')({
   component: HomePage,
+  validateSearch: (search: Record<string, unknown>): HomeSearch => ({
+    openLocation: search.openLocation === true || search.openLocation === 'true',
+  }),
 })
 
 type NearbyUser = {
@@ -76,10 +83,23 @@ function HomePage() {
   const { user: convexUser } = useCurrentUser()
   const { checkoutUrl, isUltra } = useSubscription()
   const navigate = useNavigate()
+  const { openLocation } = Route.useSearch()
   const [selectedUser, setSelectedUser] = useState<NearbyUser | null>(null)
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
-  const [viewMode, setViewMode] = useState<'grid' | 'detailed'>('grid')
+  const [viewMode, setViewMode] = useState<'grid' | 'detailed'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('piggies-view-mode')
+      if (saved === 'grid' || saved === 'detailed') return saved
+    }
+    return 'grid'
+  })
   const [onlineOnly, setOnlineOnly] = useState(false)
+
+  // Persist view mode preference
+  useEffect(() => {
+    localStorage.setItem('piggies-view-mode', viewMode)
+  }, [viewMode])
+
   const [withPhotos, setWithPhotos] = useState(false)
   const [ageFilter, setAgeFilter] = useState<{
     min?: number
@@ -115,17 +135,51 @@ function HomePage() {
     }, 2500)
   }
 
-  // Location state
+  // Location state (persisted to localStorage)
   const [locationDialogOpen, setLocationDialogOpen] = useState(false)
-  const [locationType, setLocationType] = useState<'nearby' | 'custom'>(
-    'nearby',
-  )
-  const [customLocation, setCustomLocation] = useState('')
+  const [locationType, setLocationType] = useState<'nearby' | 'custom'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('piggies-location-type')
+      if (saved === 'nearby' || saved === 'custom') return saved
+    }
+    return 'nearby'
+  })
+  const [customLocation, setCustomLocation] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('piggies-custom-location') || ''
+    }
+    return ''
+  })
   const [customLocationInput, setCustomLocationInput] = useState('')
   const [isGettingLocation, setIsGettingLocation] = useState(false)
   const [nearbyLocationName, setNearbyLocationName] = useState<string | null>(
-    null,
+    () => {
+      if (typeof window !== 'undefined') {
+        return localStorage.getItem('piggies-nearby-location')
+      }
+      return null
+    },
   )
+
+  // Persist location preference
+  useEffect(() => {
+    localStorage.setItem('piggies-location-type', locationType)
+    if (customLocation) {
+      localStorage.setItem('piggies-custom-location', customLocation)
+    }
+    if (nearbyLocationName) {
+      localStorage.setItem('piggies-nearby-location', nearbyLocationName)
+    }
+  }, [locationType, customLocation, nearbyLocationName])
+
+  // Handle openLocation search param from header
+  useEffect(() => {
+    if (openLocation) {
+      setLocationDialogOpen(true)
+      // Clear the search param
+      navigate({ to: '/home', search: {}, replace: true })
+    }
+  }, [openLocation, navigate])
 
   const getLocationDisplayText = () => {
     if (locationType === 'nearby') {
@@ -201,7 +255,7 @@ function HomePage() {
   // Get nearby users from Convex (including self)
   // Ultra members see more profiles
   const profileLimit = isUltra ? ULTRA_PROFILE_LIMIT : FREE_PROFILE_LIMIT
-  const nearbyUsers = useQuery(
+  const nearbyUsersRaw = useQuery(
     api.users.getNearbyUsers,
     convexUser?._id
       ? {
@@ -216,6 +270,15 @@ function HomePage() {
         }
       : 'skip',
   )
+
+  // Sort to ensure self user always appears first
+  const nearbyUsers = nearbyUsersRaw
+    ? [...nearbyUsersRaw].sort((a, b) => {
+        if (a.isSelf) return -1
+        if (b.isSelf) return 1
+        return 0
+      })
+    : undefined
 
   // Get users who have sent unread messages to current user
   const usersWithUnreadMessages = useQuery(
@@ -294,9 +357,30 @@ function HomePage() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Filter Bar */}
       <div className="sticky top-14 z-40 bg-background border-b border-border px-4 py-2 flex items-center gap-2 overflow-x-auto">
-        {/* Location Selector */}
+        {/* View Toggle - first on mobile */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 sm:hidden"
+          onClick={() =>
+            setViewMode(viewMode === 'grid' ? 'detailed' : 'grid')
+          }
+          title={
+            viewMode === 'grid'
+              ? 'Switch to detailed view'
+              : 'Switch to grid view'
+          }
+        >
+          {viewMode === 'grid' ? (
+            <LayoutList className="w-4 h-4" />
+          ) : (
+            <Grid3X3 className="w-4 h-4" />
+          )}
+        </Button>
+
+        {/* Location Selector - hidden on mobile (shown in header) */}
         <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
-          <DialogTrigger className="flex items-center gap-2 bg-card border border-border rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer shrink-0">
+          <DialogTrigger className="hidden sm:flex items-center gap-2 bg-card border border-border rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer shrink-0">
             <MapPin className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium truncate max-w-[100px]">
               {getLocationDisplayText()}
@@ -380,7 +464,7 @@ function HomePage() {
           </DialogContent>
         </Dialog>
 
-        <div className="w-px h-6 bg-border shrink-0" />
+        <div className="w-px h-6 bg-border shrink-0 hidden sm:block" />
         <Button
           variant={
             onlineOnly || withPhotos || ageFilter || interestFilter.length > 0
@@ -397,9 +481,11 @@ function HomePage() {
           }}
         >
           <Filter className="w-4 h-4" />
-          {onlineOnly || withPhotos || ageFilter || interestFilter.length > 0
-            ? 'Clear'
-            : 'Filters'}
+          <span className="hidden sm:inline">
+            {onlineOnly || withPhotos || ageFilter || interestFilter.length > 0
+              ? 'Clear'
+              : 'Filters'}
+          </span>
         </Button>
         <Button
           variant={onlineOnly ? 'default' : 'outline'}
@@ -574,7 +660,8 @@ function HomePage() {
         >
           Age 35-50
         </Button>
-        <div className="ml-auto shrink-0">
+        {/* View Toggle - at end on desktop only */}
+        <div className="ml-auto shrink-0 hidden sm:block">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -647,8 +734,7 @@ function HomePage() {
                       if (nearbyUser.isSelf) {
                         navigate({ to: '/profile' })
                       } else {
-                        setCurrentPhotoIndex(0)
-                        setSelectedUser(nearbyUser)
+                        navigate({ to: '/user/$userId', params: { userId: nearbyUser._id } })
                       }
                     }}
                     className={`profile-card aspect-[3/4] rounded-lg overflow-hidden cursor-pointer group relative bg-card ${
@@ -774,8 +860,7 @@ function HomePage() {
                       if (nearbyUser.isSelf) {
                         navigate({ to: '/profile' })
                       } else {
-                        setCurrentPhotoIndex(0)
-                        setSelectedUser(nearbyUser)
+                        navigate({ to: '/user/$userId', params: { userId: nearbyUser._id } })
                       }
                     }}
                     className={`bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:bg-card/80 transition-colors ${
