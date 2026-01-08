@@ -31,10 +31,11 @@ import {
   Flag,
   StarOff,
   ImageIcon,
+  CheckCheck,
 } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
-import { formatTime, formatDateDivider } from "@/lib/date-utils"
+import { formatTime, formatDateDivider, formatDistanceToNow } from "@/lib/date-utils"
 import { GifPicker } from "./GifPicker"
 import { MediaUpload } from "./MediaUpload"
 import { AlbumShareButton } from "../albums/AlbumShareButton"
@@ -485,11 +486,11 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
                         >
                           <MessageContent message={message} isOwn={isOwn} />
 
-                          {/* Time */}
+                          {/* Time and Read Receipt */}
                           {showTime && (
-                            <p
+                            <div
                               className={cn(
-                                "text-[10px] mt-1",
+                                "flex items-center gap-1 text-[10px] mt-1",
                                 message.format === "gif" || message.format === "image" || message.format === "video"
                                   ? "text-muted-foreground px-1"
                                   : isOwn
@@ -497,8 +498,14 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
                                     : "text-muted-foreground"
                               )}
                             >
-                              {formatTime(message.sentAt)}
-                            </p>
+                              <span>{formatTime(message.sentAt)}</span>
+                              {/* Read receipt for Ultra members on own messages */}
+                              {isOwn && isUltra && otherUserId && message.readAt?.[otherUserId] && (
+                                <span className="flex items-center gap-0.5 text-blue-400">
+                                  <CheckCheck className="w-3 h-3" />
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

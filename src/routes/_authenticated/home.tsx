@@ -1,5 +1,4 @@
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useAuth } from '@workos/authkit-tanstack-react-start/client'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -15,8 +14,6 @@ import {
   MapPin,
   MessageCircle,
   Filter,
-  LogOut,
-  Settings,
   User,
   Sparkles,
   X,
@@ -30,7 +27,6 @@ import {
   Share2,
   UserPlus,
   Image,
-  ImageIcon,
   Heart,
   Zap,
   Shield,
@@ -40,15 +36,7 @@ import {
   Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -81,9 +69,8 @@ type NearbyUser = {
 }
 
 function HomePage() {
-  const { user: workosUser, signOut } = useAuth()
   const { user: convexUser } = useCurrentUser()
-  const { isUltra, checkoutUrl, portalUrl } = useSubscription()
+  const { checkoutUrl } = useSubscription()
   const navigate = useNavigate()
   const [selectedUser, setSelectedUser] = useState<NearbyUser | null>(null)
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
@@ -221,6 +208,17 @@ function HomePage() {
       : 'skip',
   )
 
+  // Get users who have sent unread messages to current user
+  const usersWithUnreadMessages = useQuery(
+    api.messages.getUsersWithUnreadMessages,
+    convexUser?._id ? { userId: convexUser._id } : 'skip',
+  )
+
+  // Helper to check if a user has sent unread messages
+  const hasUnreadFrom = (userId: Id<'users'>) => {
+    return usersWithUnreadMessages?.includes(userId) ?? false
+  }
+
   const toggleCategory = (category: InterestCategory) => {
     setExpandedCategories((prev) => {
       const newSet = new Set(prev)
@@ -245,20 +243,8 @@ function HomePage() {
     setInterestFilter([])
   }
 
-  // Get unread message count
-  const unreadCount = useQuery(
-    api.messages.getUnreadCount,
-    convexUser?._id ? { userId: convexUser._id } : 'skip',
-  )
-
   // Start conversation mutation
   const startConversation = useMutation(api.messages.startConversation)
-
-  const getInitials = (firstName?: string | null, lastName?: string | null) => {
-    const first = firstName?.charAt(0) || ''
-    const last = lastName?.charAt(0) || ''
-    return (first + last).toUpperCase() || '?'
-  }
 
   const handleGoToMessages = () => {
     navigate({ to: '/messages' })
@@ -297,231 +283,98 @@ function HomePage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border">
-        <div className="flex items-center justify-between h-14 px-4">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <img
-                src="/pig-snout.svg"
-                alt="Piggies"
-                className="w-5 h-5 brightness-0 invert"
-              />
-            </div>
-            <span className="text-lg font-bold hidden sm:block">Piggies</span>
-          </Link>
-
-          {/* Location Selector */}
-          <Dialog
-            open={locationDialogOpen}
-            onOpenChange={setLocationDialogOpen}
-          >
-            <DialogTrigger className="flex items-center gap-2 bg-card border border-border rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer">
-              <MapPin className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium truncate max-w-[120px]">
-                {getLocationDisplayText()}
-              </span>
-              <ChevronDown className="w-3 h-3 text-muted-foreground" />
-            </DialogTrigger>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle>Set Your Location</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                {/* Use My Location Option */}
-                <button
-                  onClick={handleUseMyLocation}
-                  disabled={isGettingLocation}
-                  className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                    locationType === 'nearby' && nearbyLocationName
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50'
-                  } ${isGettingLocation ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
-                >
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                    {isGettingLocation ? (
-                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                    ) : (
-                      <Navigation className="w-5 h-5 text-primary" />
-                    )}
-                  </div>
-                  <div className="text-left">
-                    <p className="font-semibold text-foreground">
-                      Use My Location
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {isGettingLocation
-                        ? 'Getting location...'
-                        : nearbyLocationName
-                          ? `Currently: ${nearbyLocationName}`
-                          : 'Find people near you'}
-                    </p>
-                  </div>
-                </button>
-
-                {/* Divider */}
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-muted-foreground">or</span>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-
-                {/* City/Zip Input */}
-                <div className="space-y-3">
-                  <p className="font-semibold text-foreground">
-                    Enter City or Zip Code
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="e.g., Miami or 33101"
-                      value={customLocationInput}
-                      onChange={(e) => setCustomLocationInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSetCustomLocation()
-                        }
-                      }}
-                      className="flex-1"
-                    />
-                    <Button onClick={handleSetCustomLocation} size="sm">
-                      Set
-                    </Button>
-                  </div>
-                  {locationType === 'custom' && customLocation && (
-                    <p className="text-sm text-muted-foreground">
-                      Currently set to:{' '}
-                      <span className="text-primary font-medium">
-                        {customLocation}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Nav Icons */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
-              onClick={() => navigate({ to: '/waves' })}
-            >
-              <img
-                src="/waving.svg"
-                alt="Waves"
-                className="w-5 h-5 invert opacity-60"
-              />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
-              onClick={() => navigate({ to: '/messages' })}
-            >
-              <MessageCircle className="w-5 h-5" />
-              {(unreadCount ?? 0) > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-primary text-[10px] text-white rounded-full flex items-center justify-center font-bold">
-                  {unreadCount! > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </Button>
-
-            {/* User Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger className="ml-1 p-2 rounded-lg hover:bg-accent">
-                <Avatar size="sm">
-                  <AvatarImage
-                    src={workosUser?.profilePictureUrl || undefined}
-                    alt={workosUser?.firstName || 'User'}
-                  />
-                  <AvatarFallback className="bg-primary text-white text-xs">
-                    {getInitials(workosUser?.firstName, workosUser?.lastName)}
-                  </AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-56 bg-card border-border"
-              >
-                <div className="px-3 py-2">
-                  <p className="font-medium">
-                    {workosUser?.firstName} {workosUser?.lastName}
-                  </p>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {workosUser?.email}
-                  </p>
-                </div>
-                <DropdownMenuSeparator className="bg-border" />
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onClick={() => navigate({ to: '/profile' })}
-                >
-                  <User className="mr-2 w-4 h-4" />
-                  Edit Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onClick={() => navigate({ to: '/album' })}
-                >
-                  <ImageIcon className="mr-2 w-4 h-4" />
-                  Private Album
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onClick={() => navigate({ to: '/who-viewed-me' })}
-                >
-                  <Eye className="mr-2 w-4 h-4" />
-                  Who Viewed Me
-                </DropdownMenuItem>
-                {isUltra ? (
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    onClick={() =>
-                      portalUrl && (window.location.href = portalUrl)
-                    }
-                  >
-                    <Sparkles className="mr-2 w-4 h-4 text-amber-500" />
-                    <span className="bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent font-medium">
-                      Piggies Ultra
-                    </span>
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    onClick={() =>
-                      checkoutUrl && (window.location.href = checkoutUrl)
-                    }
-                  >
-                    <Sparkles className="mr-2 w-4 h-4 text-amber-500" />
-                    Upgrade to Ultra
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onClick={() => navigate({ to: '/settings' })}
-                >
-                  <Settings className="mr-2 w-4 h-4" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-border" />
-                <DropdownMenuItem
-                  onClick={() => signOut()}
-                  className="text-destructive focus:text-destructive cursor-pointer"
-                >
-                  <LogOut className="mr-2 w-4 h-4" />
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </header>
-
       {/* Filter Bar */}
       <div className="sticky top-14 z-40 bg-background border-b border-border px-4 py-2 flex items-center gap-2 overflow-x-auto">
+        {/* Location Selector */}
+        <Dialog
+          open={locationDialogOpen}
+          onOpenChange={setLocationDialogOpen}
+        >
+          <DialogTrigger className="flex items-center gap-2 bg-card border border-border rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer shrink-0">
+            <MapPin className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium truncate max-w-[100px]">
+              {getLocationDisplayText()}
+            </span>
+            <ChevronDown className="w-3 h-3 text-muted-foreground" />
+          </DialogTrigger>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Set Your Location</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              {/* Use My Location Option */}
+              <button
+                onClick={handleUseMyLocation}
+                disabled={isGettingLocation}
+                className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                  locationType === 'nearby' && nearbyLocationName
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/50'
+                } ${isGettingLocation ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                  {isGettingLocation ? (
+                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                  ) : (
+                    <Navigation className="w-5 h-5 text-primary" />
+                  )}
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-foreground">
+                    Use My Location
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {isGettingLocation
+                      ? 'Getting location...'
+                      : nearbyLocationName
+                        ? `Currently: ${nearbyLocationName}`
+                        : 'Find people near you'}
+                  </p>
+                </div>
+              </button>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground">or</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              {/* City/Zip Input */}
+              <div className="space-y-3">
+                <p className="font-semibold text-foreground">
+                  Enter City or Zip Code
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g., Miami or 33101"
+                    value={customLocationInput}
+                    onChange={(e) => setCustomLocationInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSetCustomLocation()
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleSetCustomLocation} size="sm">
+                    Set
+                  </Button>
+                </div>
+                {locationType === 'custom' && customLocation && (
+                  <p className="text-sm text-muted-foreground">
+                    Currently set to:{' '}
+                    <span className="text-primary font-medium">
+                      {customLocation}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <div className="w-px h-6 bg-border shrink-0" />
         <Button
           variant={
             onlineOnly || withPhotos || ageFilter || interestFilter.length > 0
@@ -793,8 +646,8 @@ function HomePage() {
                       }
                     }}
                     className={`profile-card aspect-[3/4] rounded-lg overflow-hidden cursor-pointer group relative bg-card ${
-                      nearbyUser.isSelf
-                        ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                      !nearbyUser.isSelf && hasUnreadFrom(nearbyUser._id)
+                        ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-background'
                         : ''
                     }`}
                   >
@@ -805,8 +658,12 @@ function HomePage() {
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="w-full h-full bg-muted flex items-center justify-center">
-                        <User className="w-12 h-12 text-muted-foreground" />
+                      <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 flex items-center justify-center">
+                        <img
+                          src="/pig-snout.svg"
+                          alt=""
+                          className="w-16 h-16 opacity-60"
+                        />
                       </div>
                     )}
 
@@ -892,8 +749,8 @@ function HomePage() {
                       }
                     }}
                     className={`bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:bg-card/80 transition-colors ${
-                      nearbyUser.isSelf
-                        ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                      !nearbyUser.isSelf && hasUnreadFrom(nearbyUser._id)
+                        ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-background'
                         : ''
                     }`}
                   >
@@ -907,8 +764,12 @@ function HomePage() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <User className="w-10 h-10 text-muted-foreground" />
+                          <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 flex items-center justify-center">
+                            <img
+                              src="/pig-snout.svg"
+                              alt=""
+                              className="w-12 h-12 opacity-60"
+                            />
                           </div>
                         )}
                         {/* Online indicator */}
@@ -1255,8 +1116,12 @@ function HomePage() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-muted flex items-center justify-center">
-                        <User className="w-24 h-24 text-muted-foreground" />
+                      <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 flex items-center justify-center">
+                        <img
+                          src="/pig-snout.svg"
+                          alt=""
+                          className="w-32 h-32 opacity-60"
+                        />
                       </div>
                     )}
 

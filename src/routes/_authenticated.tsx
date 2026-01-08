@@ -82,8 +82,7 @@ function AuthenticatedLayout() {
 
   // Hide nav elements on certain pages
   const hideNav = location.pathname === '/onboarding' || location.pathname.startsWith('/admin')
-  // Home and messages pages have their own headers
-  const hideHeader = hideNav || location.pathname === '/home' || location.pathname === '/messages'
+  const hideHeader = hideNav
 
   return (
     <>

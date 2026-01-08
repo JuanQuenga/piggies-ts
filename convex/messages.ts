@@ -415,6 +415,54 @@ export const getUnreadCount = query({
   },
 });
 
+// Get user IDs who have sent unread messages to the current user
+export const getUsersWithUnreadMessages = query({
+  args: {
+    userId: v.id("users"),
+  },
+  returns: v.array(v.id("users")),
+  handler: async (ctx, args) => {
+    const allConversations = await ctx.db
+      .query("conversations")
+      .order("desc")
+      .collect();
+
+    const userConversations = allConversations.filter((c) =>
+      c.participantIds.includes(args.userId)
+    );
+
+    const usersWithUnread: Id<"users">[] = [];
+
+    for (const conversation of userConversations) {
+      // Get all unread messages from the other user
+      const unreadMessages = await ctx.db
+        .query("messages")
+        .withIndex("by_conversation", (q) =>
+          q.eq("conversationId", conversation._id)
+        )
+        .filter((q) => q.neq(q.field("senderId"), args.userId))
+        .collect();
+
+      // Check if any message is unread
+      const hasUnread = unreadMessages.some(
+        (msg) => !msg.readAt || !msg.readAt[args.userId]
+      );
+
+      if (hasUnread) {
+        // Find the other participant
+        const otherUserId = conversation.participantIds.find(
+          (id) => id !== args.userId
+        );
+        if (otherUserId && !usersWithUnread.includes(otherUserId)) {
+          usersWithUnread.push(otherUserId);
+        }
+      }
+    }
+
+    return usersWithUnread;
+  },
+});
+
 // Get conversation details
 export const getConversation = query({
   args: {
