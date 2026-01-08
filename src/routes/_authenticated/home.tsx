@@ -68,9 +68,13 @@ type NearbyUser = {
   } | null
 }
 
+// Profile limits based on subscription
+const FREE_PROFILE_LIMIT = 1
+const ULTRA_PROFILE_LIMIT = 100
+
 function HomePage() {
   const { user: convexUser } = useCurrentUser()
-  const { checkoutUrl } = useSubscription()
+  const { checkoutUrl, isUltra } = useSubscription()
   const navigate = useNavigate()
   const [selectedUser, setSelectedUser] = useState<NearbyUser | null>(null)
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
@@ -88,20 +92,22 @@ function HomePage() {
   >(new Set(['hobbies']))
 
   // Wave animation state: 'waving' -> 'success' -> cleared
-  const [wavingUsers, setWavingUsers] = useState<Record<string, 'waving' | 'success'>>({})
+  const [wavingUsers, setWavingUsers] = useState<
+    Record<string, 'waving' | 'success'>
+  >({})
 
   const handleWaveWithAnimation = (userId: string) => {
     // Set to waving state
-    setWavingUsers(prev => ({ ...prev, [userId]: 'waving' }))
+    setWavingUsers((prev) => ({ ...prev, [userId]: 'waving' }))
 
     // After animation, show success
     setTimeout(() => {
-      setWavingUsers(prev => ({ ...prev, [userId]: 'success' }))
+      setWavingUsers((prev) => ({ ...prev, [userId]: 'success' }))
     }, 800)
 
     // Clear success state after a bit
     setTimeout(() => {
-      setWavingUsers(prev => {
+      setWavingUsers((prev) => {
         const next = { ...prev }
         delete next[userId]
         return next
@@ -193,11 +199,14 @@ function HomePage() {
   }
 
   // Get nearby users from Convex (including self)
+  // Ultra members see more profiles
+  const profileLimit = isUltra ? ULTRA_PROFILE_LIMIT : FREE_PROFILE_LIMIT
   const nearbyUsers = useQuery(
     api.users.getNearbyUsers,
     convexUser?._id
       ? {
           currentUserId: convexUser._id,
+          limit: profileLimit,
           onlineOnly,
           withPhotos,
           minAge: ageFilter?.min,
@@ -286,10 +295,7 @@ function HomePage() {
       {/* Filter Bar */}
       <div className="sticky top-14 z-40 bg-background border-b border-border px-4 py-2 flex items-center gap-2 overflow-x-auto">
         {/* Location Selector */}
-        <Dialog
-          open={locationDialogOpen}
-          onOpenChange={setLocationDialogOpen}
-        >
+        <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
           <DialogTrigger className="flex items-center gap-2 bg-card border border-border rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer shrink-0">
             <MapPin className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium truncate max-w-[100px]">
@@ -733,6 +739,30 @@ function HomePage() {
                     )}
                   </div>
                 ))}
+
+                {/* Upsell for free users when at profile limit */}
+                {!isUltra && nearbyUsers.length >= FREE_PROFILE_LIMIT && (
+                  <div
+                    className="profile-card aspect-[3/4] rounded-lg overflow-hidden cursor-pointer group relative bg-gradient-to-br from-amber-500/20 via-primary/20 to-primary/30 flex flex-col items-center justify-center p-4 text-center border-2 border-dashed border-primary/50 hover:border-primary transition-colors"
+                    onClick={() =>
+                      checkoutUrl && (window.location.href = checkoutUrl)
+                    }
+                  >
+                    <Shield className="w-10 h-10 text-amber-500 mb-2" />
+                    <p className="text-sm font-bold text-foreground">
+                      See More Profiles
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Upgrade to Ultra for {ULTRA_PROFILE_LIMIT}+ profiles
+                    </p>
+                    <Button
+                      size="sm"
+                      className="mt-3 bg-amber-500 hover:bg-amber-600 text-black font-bold"
+                    >
+                      Get Ultra
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               /* Detailed View */
@@ -853,9 +883,13 @@ function HomePage() {
                               size="sm"
                               variant="outline"
                               className={`flex-1 h-8 text-xs transition-all duration-300 ${
-                                wavingUsers[nearbyUser._id] === 'waving' ? 'wave-button-waving' : ''
+                                wavingUsers[nearbyUser._id] === 'waving'
+                                  ? 'wave-button-waving'
+                                  : ''
                               } ${
-                                wavingUsers[nearbyUser._id] === 'success' ? 'bg-green-500 border-green-500 text-white hover:bg-green-500' : ''
+                                wavingUsers[nearbyUser._id] === 'success'
+                                  ? 'bg-green-500 border-green-500 text-white hover:bg-green-500'
+                                  : ''
                               }`}
                               onClick={(e) => {
                                 e.stopPropagation()
@@ -898,6 +932,27 @@ function HomePage() {
                     </div>
                   </div>
                 ))}
+
+                {/* Upsell for free users when at profile limit */}
+                {!isUltra && nearbyUsers.length >= FREE_PROFILE_LIMIT && (
+                  <div
+                    className="bg-gradient-to-br from-amber-500/20 via-primary/20 to-primary/30 border-2 border-dashed border-primary/50 hover:border-primary transition-colors rounded-xl overflow-hidden cursor-pointer p-6 flex flex-col items-center justify-center text-center"
+                    onClick={() =>
+                      checkoutUrl && (window.location.href = checkoutUrl)
+                    }
+                  >
+                    <Shield className="w-12 h-12 text-amber-500 mb-3" />
+                    <h3 className="text-lg font-bold text-foreground">
+                      Want to See More?
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1 mb-4">
+                      Upgrade to Ultra to browse {ULTRA_PROFILE_LIMIT}+ profiles
+                    </p>
+                    <Button className="bg-amber-500 hover:bg-amber-600 text-black font-bold">
+                      Get Ultra
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1243,9 +1298,13 @@ function HomePage() {
                 <Button
                   variant="outline"
                   className={`flex-1 h-12 border-2 transition-all duration-300 ${
-                    wavingUsers[selectedUser._id] === 'waving' ? 'wave-button-waving border-border' : 'border-border hover:border-primary'
+                    wavingUsers[selectedUser._id] === 'waving'
+                      ? 'wave-button-waving border-border'
+                      : 'border-border hover:border-primary'
                   } ${
-                    wavingUsers[selectedUser._id] === 'success' ? 'bg-green-500 border-green-500 text-white hover:bg-green-500 hover:border-green-500' : ''
+                    wavingUsers[selectedUser._id] === 'success'
+                      ? 'bg-green-500 border-green-500 text-white hover:bg-green-500 hover:border-green-500'
+                      : ''
                   }`}
                   onClick={() => {
                     if (!wavingUsers[selectedUser._id]) {
