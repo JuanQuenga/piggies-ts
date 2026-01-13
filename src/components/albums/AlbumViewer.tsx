@@ -23,6 +23,8 @@ import {
 interface AlbumViewerProps {
   viewerUserId: Id<"users">
   ownerUserId: Id<"users">
+  albumId?: Id<"privateAlbums">
+  albumName?: string
   ownerName: string
   isOpen: boolean
   onClose: () => void
@@ -32,6 +34,8 @@ interface AlbumViewerProps {
 export function AlbumViewer({
   viewerUserId,
   ownerUserId,
+  albumId,
+  albumName,
   ownerName,
   isOpen,
   onClose,
@@ -39,9 +43,9 @@ export function AlbumViewer({
 }: AlbumViewerProps) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null)
 
-  const albumPhotos = useQuery(
+  const albumData = useQuery(
     api.albums.viewUserAlbum,
-    isOpen ? { viewerUserId, ownerUserId } : "skip"
+    isOpen ? { viewerUserId, ownerUserId, albumId } : "skip"
   )
 
   const formatExpiry = (expires?: number) => {
@@ -56,6 +60,8 @@ export function AlbumViewer({
   }
 
   const expiryText = formatExpiry(expiresAt)
+  const photos = albumData?.photos ?? []
+  const displayName = albumName ?? albumData?.albumName ?? `${ownerName}'s Album`
 
   const handlePrevPhoto = () => {
     if (selectedPhotoIndex !== null && selectedPhotoIndex > 0) {
@@ -64,7 +70,7 @@ export function AlbumViewer({
   }
 
   const handleNextPhoto = () => {
-    if (selectedPhotoIndex !== null && albumPhotos && selectedPhotoIndex < albumPhotos.length - 1) {
+    if (selectedPhotoIndex !== null && photos && selectedPhotoIndex < photos.length - 1) {
       setSelectedPhotoIndex(selectedPhotoIndex + 1)
     }
   }
@@ -75,8 +81,8 @@ export function AlbumViewer({
         <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ImageIcon className="w-5 h-5" />
-              {ownerName}'s Album
+              <Lock className="w-5 h-5" />
+              {displayName}
             </DialogTitle>
             {expiryText && (
               <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -87,11 +93,11 @@ export function AlbumViewer({
           </DialogHeader>
 
           <ScrollArea className="max-h-[60vh]">
-            {albumPhotos === undefined ? (
+            {albumData === undefined ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               </div>
-            ) : albumPhotos === null ? (
+            ) : albumData === null ? (
               <div className="flex flex-col items-center justify-center py-12 gap-4">
                 <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
                   <Lock className="w-8 h-8 text-muted-foreground" />
@@ -103,7 +109,7 @@ export function AlbumViewer({
                   </p>
                 </div>
               </div>
-            ) : albumPhotos.length === 0 ? (
+            ) : photos.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 gap-4">
                 <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
                   <ImageIcon className="w-8 h-8 text-muted-foreground" />
@@ -117,7 +123,7 @@ export function AlbumViewer({
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
-                {albumPhotos.map((photo, index) => (
+                {photos.map((photo, index) => (
                   <button
                     key={photo._id}
                     onClick={() => setSelectedPhotoIndex(index)}
@@ -143,7 +149,7 @@ export function AlbumViewer({
       </Dialog>
 
       {/* Lightbox for viewing individual photos */}
-      {selectedPhotoIndex !== null && albumPhotos && albumPhotos[selectedPhotoIndex] && (
+      {selectedPhotoIndex !== null && photos && photos[selectedPhotoIndex] && (
         <div
           className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
           onClick={() => setSelectedPhotoIndex(null)}
@@ -160,7 +166,7 @@ export function AlbumViewer({
 
           {/* Photo counter */}
           <div className="absolute top-4 left-4 text-white/80 text-sm">
-            {selectedPhotoIndex + 1} / {albumPhotos.length}
+            {selectedPhotoIndex + 1} / {photos.length}
           </div>
 
           {/* Navigation buttons */}
@@ -178,7 +184,7 @@ export function AlbumViewer({
             </Button>
           )}
 
-          {selectedPhotoIndex < albumPhotos.length - 1 && (
+          {selectedPhotoIndex < photos.length - 1 && (
             <Button
               variant="ghost"
               size="icon"
@@ -195,13 +201,13 @@ export function AlbumViewer({
           {/* Image */}
           <div className="max-w-[90vw] max-h-[90vh] p-4" onClick={(e) => e.stopPropagation()}>
             <img
-              src={albumPhotos[selectedPhotoIndex].url ?? ""}
-              alt={albumPhotos[selectedPhotoIndex].caption || "Album photo"}
+              src={photos[selectedPhotoIndex].url ?? ""}
+              alt={photos[selectedPhotoIndex].caption || "Album photo"}
               className="max-w-full max-h-[85vh] object-contain rounded-lg"
             />
-            {albumPhotos[selectedPhotoIndex].caption && (
+            {photos[selectedPhotoIndex].caption && (
               <p className="text-white/80 text-center mt-4 text-sm">
-                {albumPhotos[selectedPhotoIndex].caption}
+                {photos[selectedPhotoIndex].caption}
               </p>
             )}
           </div>

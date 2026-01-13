@@ -225,6 +225,7 @@ export const getProfile = query({
       profilePhotoIds: v.optional(v.array(v.id("_storage"))),
       latitude: v.optional(v.number()),
       longitude: v.optional(v.number()),
+      locationName: v.optional(v.string()),
       onboardingComplete: v.optional(v.boolean()),
       lookingFor: v.optional(v.string()),
       interests: v.optional(v.array(v.string())),
@@ -268,6 +269,34 @@ export const updateProfile = mutation({
     );
 
     await ctx.db.patch(profile._id, filteredUpdates);
+    return null;
+  },
+});
+
+// Update user location
+export const updateLocation = mutation({
+  args: {
+    userId: v.id("users"),
+    latitude: v.number(),
+    longitude: v.number(),
+    locationName: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .unique();
+
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+
+    await ctx.db.patch(profile._id, {
+      latitude: args.latitude,
+      longitude: args.longitude,
+      locationName: args.locationName,
+    });
     return null;
   },
 });
@@ -413,6 +442,11 @@ export const getNearbyUsers = query({
     maxAge: v.optional(v.number()),
     interests: v.optional(v.array(v.string())),
     includeSelf: v.optional(v.boolean()),
+    // Location filtering
+    latitude: v.optional(v.number()),
+    longitude: v.optional(v.number()),
+    maxDistanceMiles: v.optional(v.number()), // Max distance in miles
+    locationName: v.optional(v.string()), // For custom location text matching
   },
   returns: v.array(
     v.object({
@@ -422,6 +456,7 @@ export const getNearbyUsers = query({
       isOnline: v.optional(v.boolean()),
       lastActive: v.optional(v.number()),
       isSelf: v.optional(v.boolean()),
+      distanceMiles: v.optional(v.number()),
       profile: v.union(
         v.object({
           displayName: v.optional(v.string()),
@@ -432,6 +467,7 @@ export const getNearbyUsers = query({
           lookingFor: v.optional(v.string()),
           interests: v.optional(v.array(v.string())),
           onboardingComplete: v.optional(v.boolean()),
+          locationName: v.optional(v.string()),
         }),
         v.null()
       ),
@@ -439,6 +475,26 @@ export const getNearbyUsers = query({
   ),
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50;
+
+    // Helper function to calculate distance between two points using Haversine formula
+    const calculateDistanceMiles = (
+      lat1: number,
+      lon1: number,
+      lat2: number,
+      lon2: number
+    ): number => {
+      const R = 3959; // Earth's radius in miles
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
 
     // Get all users
     const users = await ctx.db.query("users").collect();
@@ -488,6 +544,22 @@ export const getNearbyUsers = query({
           profilePhotoUrls = urls.filter((url): url is string => url !== null);
         }
 
+        // Calculate distance if coordinates are provided
+        let distanceMiles: number | undefined;
+        if (
+          args.latitude !== undefined &&
+          args.longitude !== undefined &&
+          profile?.latitude !== undefined &&
+          profile?.longitude !== undefined
+        ) {
+          distanceMiles = calculateDistanceMiles(
+            args.latitude,
+            args.longitude,
+            profile.latitude,
+            profile.longitude
+          );
+        }
+
         return {
           _id: user._id,
           name: user.name,
@@ -495,6 +567,7 @@ export const getNearbyUsers = query({
           isOnline: user.isOnline,
           lastActive: user.lastActive,
           isSelf: user._id === args.currentUserId,
+          distanceMiles,
           profile: profile
             ? {
                 displayName: profile.displayName,
@@ -505,6 +578,7 @@ export const getNearbyUsers = query({
                 lookingFor: profile.lookingFor,
                 interests: profile.interests,
                 onboardingComplete: profile.onboardingComplete,
+                locationName: profile.locationName,
               }
             : null,
         };
@@ -540,6 +614,41 @@ export const getNearbyUsers = query({
         const userInterests = u.profile?.interests;
         if (!userInterests || userInterests.length === 0) return false;
         return args.interests!.some((interest) => userInterests.includes(interest));
+      });
+    }
+
+    // Filter by max distance (if coordinates provided)
+    if (args.latitude !== undefined && args.longitude !== undefined && args.maxDistanceMiles !== undefined) {
+      result = result.filter((u) => {
+        // Self user always passes distance filter
+        if (u.isSelf) return true;
+        // Users without distance info are excluded when distance filtering is active
+        if (u.distanceMiles === undefined) return false;
+        return u.distanceMiles <= args.maxDistanceMiles!;
+      });
+    }
+
+    // Filter by location name (case-insensitive partial match)
+    if (args.locationName) {
+      const searchTerm = args.locationName.toLowerCase();
+      result = result.filter((u) => {
+        // Self user always passes location filter
+        if (u.isSelf) return true;
+        const profileLocation = u.profile?.locationName?.toLowerCase() || "";
+        return profileLocation.includes(searchTerm) || searchTerm.includes(profileLocation);
+      });
+    }
+
+    // Sort by distance if coordinates provided (closest first)
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      result.sort((a, b) => {
+        // Self always comes first
+        if (a.isSelf) return -1;
+        if (b.isSelf) return 1;
+        // Sort by distance
+        const distA = a.distanceMiles ?? Infinity;
+        const distB = b.distanceMiles ?? Infinity;
+        return distA - distB;
       });
     }
 
@@ -956,5 +1065,394 @@ export const getPrimaryProfilePhotoUrl = query({
     }
 
     return await ctx.storage.getUrl(profile.profilePhotoIds[0]);
+  },
+});
+
+// ============================================================================
+// HOME PAGE QUERIES
+// ============================================================================
+
+// Get new profiles (recently joined users with complete profiles)
+export const getNewProfiles = query({
+  args: {
+    currentUserId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("users"),
+      name: v.string(),
+      imageUrl: v.optional(v.string()),
+      isOnline: v.optional(v.boolean()),
+      createdAt: v.number(),
+      profile: v.union(
+        v.object({
+          displayName: v.optional(v.string()),
+          age: v.optional(v.number()),
+          profilePhotoUrl: v.optional(v.string()),
+          lookingFor: v.optional(v.string()),
+        }),
+        v.null()
+      ),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 10;
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+
+    // Get all users created in the last day
+    const users = await ctx.db.query("users").collect();
+
+    // Filter to new users (excluding current user, banned, suspended, hidden)
+    const newUsers = users.filter((u) => {
+      if (u._id === args.currentUserId) return false;
+      if (u.isBanned === true) return false;
+      if (u.isSuspended === true && u.suspendedUntil && u.suspendedUntil > Date.now()) return false;
+      if (u.hideFromDiscovery === true) return false;
+      if (u._creationTime < oneDayAgo) return false;
+      return true;
+    });
+
+    // Sort by creation time (newest first)
+    newUsers.sort((a, b) => b._creationTime - a._creationTime);
+
+    // Get profiles and filter to those with complete onboarding
+    const usersWithProfiles = await Promise.all(
+      newUsers.slice(0, limit * 2).map(async (user) => {
+        const profile = await ctx.db
+          .query("profiles")
+          .withIndex("by_userId", (q) => q.eq("userId", user._id))
+          .unique();
+
+        if (!profile?.onboardingComplete) return null;
+
+        // Get first profile photo URL
+        let profilePhotoUrl: string | undefined;
+        if (profile.profilePhotoIds && profile.profilePhotoIds.length > 0) {
+          profilePhotoUrl = await ctx.storage.getUrl(profile.profilePhotoIds[0]) ?? undefined;
+        }
+
+        return {
+          _id: user._id,
+          name: user.name,
+          imageUrl: user.imageUrl,
+          isOnline: user.isOnline,
+          createdAt: user._creationTime,
+          profile: {
+            displayName: profile.displayName,
+            age: profile.age,
+            profilePhotoUrl,
+            lookingFor: profile.lookingFor,
+          },
+        };
+      })
+    );
+
+    return usersWithProfiles
+      .filter((u): u is NonNullable<typeof u> => u !== null)
+      .slice(0, limit);
+  },
+});
+
+// Get recommended profiles (online users with photos)
+export const getRecommendedProfiles = query({
+  args: {
+    currentUserId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("users"),
+      name: v.string(),
+      imageUrl: v.optional(v.string()),
+      isOnline: v.optional(v.boolean()),
+      lastActive: v.optional(v.number()),
+      profile: v.union(
+        v.object({
+          displayName: v.optional(v.string()),
+          age: v.optional(v.number()),
+          profilePhotoUrl: v.optional(v.string()),
+          lookingFor: v.optional(v.string()),
+          interests: v.optional(v.array(v.string())),
+        }),
+        v.null()
+      ),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 10;
+
+    // Get all users
+    const users = await ctx.db.query("users").collect();
+
+    // Filter to valid users
+    const validUsers = users.filter((u) => {
+      if (u._id === args.currentUserId) return false;
+      if (u.isBanned === true) return false;
+      if (u.isSuspended === true && u.suspendedUntil && u.suspendedUntil > Date.now()) return false;
+      if (u.hideFromDiscovery === true) return false;
+      return true;
+    });
+
+    // Sort by online status and last active
+    validUsers.sort((a, b) => {
+      // Online users first
+      if (a.isOnline && !b.isOnline) return -1;
+      if (!a.isOnline && b.isOnline) return 1;
+      // Then by last active
+      return (b.lastActive ?? 0) - (a.lastActive ?? 0);
+    });
+
+    // Get profiles and filter to those with photos
+    const usersWithProfiles = await Promise.all(
+      validUsers.slice(0, limit * 2).map(async (user) => {
+        const profile = await ctx.db
+          .query("profiles")
+          .withIndex("by_userId", (q) => q.eq("userId", user._id))
+          .unique();
+
+        if (!profile?.onboardingComplete) return null;
+        if (!profile.profilePhotoIds || profile.profilePhotoIds.length === 0) return null;
+
+        // Get first profile photo URL
+        const profilePhotoUrl = await ctx.storage.getUrl(profile.profilePhotoIds[0]) ?? undefined;
+
+        return {
+          _id: user._id,
+          name: user.name,
+          imageUrl: user.imageUrl,
+          isOnline: user.isOnline,
+          lastActive: user.lastActive,
+          profile: {
+            displayName: profile.displayName,
+            age: profile.age,
+            profilePhotoUrl,
+            lookingFor: profile.lookingFor,
+            interests: profile.interests,
+          },
+        };
+      })
+    );
+
+    return usersWithProfiles
+      .filter((u): u is NonNullable<typeof u> => u !== null)
+      .slice(0, limit);
+  },
+});
+
+// ============================================================================
+// PROFILE VIEW TRACKING (for free user limits)
+// ============================================================================
+
+// Daily limits for free vs ultra users
+const FREE_DAILY_PROFILE_VIEW_LIMIT = 5;
+const FREE_DAILY_MESSAGE_LIMIT = 3;
+
+// Record a profile view
+export const recordProfileView = mutation({
+  args: {
+    viewerId: v.id("users"),
+    viewedId: v.id("users"),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    viewsToday: v.number(),
+    limitReached: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    if (args.viewerId === args.viewedId) {
+      return { success: true, viewsToday: 0, limitReached: false };
+    }
+
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+    // Check if this exact view already exists today (to avoid duplicates)
+    const existingView = await ctx.db
+      .query("profileViews")
+      .withIndex("by_viewer_viewed", (q) =>
+        q.eq("viewerId", args.viewerId).eq("viewedId", args.viewedId)
+      )
+      .filter((q) => q.eq(q.field("date"), today))
+      .unique();
+
+    // If already viewed today, just return current count
+    if (existingView) {
+      const todayViews = await ctx.db
+        .query("profileViews")
+        .withIndex("by_viewer_date", (q) =>
+          q.eq("viewerId", args.viewerId).eq("date", today)
+        )
+        .collect();
+      return {
+        success: true,
+        viewsToday: todayViews.length,
+        limitReached: false,
+      };
+    }
+
+    // Record the new view
+    await ctx.db.insert("profileViews", {
+      viewerId: args.viewerId,
+      viewedId: args.viewedId,
+      viewedAt: Date.now(),
+      date: today,
+    });
+
+    // Get updated count
+    const todayViews = await ctx.db
+      .query("profileViews")
+      .withIndex("by_viewer_date", (q) =>
+        q.eq("viewerId", args.viewerId).eq("date", today)
+      )
+      .collect();
+
+    return {
+      success: true,
+      viewsToday: todayViews.length,
+      limitReached: todayViews.length >= FREE_DAILY_PROFILE_VIEW_LIMIT,
+    };
+  },
+});
+
+// Get daily profile view count for a user
+export const getDailyProfileViewCount = query({
+  args: {
+    userId: v.id("users"),
+  },
+  returns: v.object({
+    viewsToday: v.number(),
+    limit: v.number(),
+    remaining: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const today = new Date().toISOString().split("T")[0];
+
+    const todayViews = await ctx.db
+      .query("profileViews")
+      .withIndex("by_viewer_date", (q) =>
+        q.eq("viewerId", args.userId).eq("date", today)
+      )
+      .collect();
+
+    // Get unique viewed users (in case of duplicates)
+    const uniqueViewed = new Set(todayViews.map((v) => v.viewedId));
+
+    return {
+      viewsToday: uniqueViewed.size,
+      limit: FREE_DAILY_PROFILE_VIEW_LIMIT,
+      remaining: Math.max(0, FREE_DAILY_PROFILE_VIEW_LIMIT - uniqueViewed.size),
+    };
+  },
+});
+
+// Check if user can view more profiles today (for free users)
+export const canViewProfile = query({
+  args: {
+    userId: v.id("users"),
+    targetUserId: v.id("users"),
+  },
+  returns: v.object({
+    canView: v.boolean(),
+    viewsToday: v.number(),
+    limit: v.number(),
+    alreadyViewed: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    // Can always view own profile
+    if (args.userId === args.targetUserId) {
+      return { canView: true, viewsToday: 0, limit: FREE_DAILY_PROFILE_VIEW_LIMIT, alreadyViewed: false };
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+
+    // Check if already viewed this profile today
+    const existingView = await ctx.db
+      .query("profileViews")
+      .withIndex("by_viewer_viewed", (q) =>
+        q.eq("viewerId", args.userId).eq("viewedId", args.targetUserId)
+      )
+      .filter((q) => q.eq(q.field("date"), today))
+      .unique();
+
+    if (existingView) {
+      // Already viewed, can view again
+      const todayViews = await ctx.db
+        .query("profileViews")
+        .withIndex("by_viewer_date", (q) =>
+          q.eq("viewerId", args.userId).eq("date", today)
+        )
+        .collect();
+      const uniqueViewed = new Set(todayViews.map((v) => v.viewedId));
+      return {
+        canView: true,
+        viewsToday: uniqueViewed.size,
+        limit: FREE_DAILY_PROFILE_VIEW_LIMIT,
+        alreadyViewed: true,
+      };
+    }
+
+    // Check total views today
+    const todayViews = await ctx.db
+      .query("profileViews")
+      .withIndex("by_viewer_date", (q) =>
+        q.eq("viewerId", args.userId).eq("date", today)
+      )
+      .collect();
+    const uniqueViewed = new Set(todayViews.map((v) => v.viewedId));
+
+    return {
+      canView: uniqueViewed.size < FREE_DAILY_PROFILE_VIEW_LIMIT,
+      viewsToday: uniqueViewed.size,
+      limit: FREE_DAILY_PROFILE_VIEW_LIMIT,
+      alreadyViewed: false,
+    };
+  },
+});
+
+// Get daily interaction limits for a user
+export const getDailyLimits = query({
+  args: {
+    userId: v.id("users"),
+  },
+  returns: v.object({
+    profileViews: v.object({
+      used: v.number(),
+      limit: v.number(),
+      remaining: v.number(),
+    }),
+    messages: v.object({
+      used: v.number(),
+      limit: v.number(),
+      remaining: v.number(),
+    }),
+  }),
+  handler: async (ctx, args) => {
+    const today = new Date().toISOString().split("T")[0];
+
+    // Get profile views today
+    const todayViews = await ctx.db
+      .query("profileViews")
+      .withIndex("by_viewer_date", (q) =>
+        q.eq("viewerId", args.userId).eq("date", today)
+      )
+      .collect();
+    const uniqueViewed = new Set(todayViews.map((v) => v.viewedId));
+
+    // Get messages sent today (we'll count conversations started today)
+    // For now, just return the view limits - message limits can be added later
+    const viewsUsed = uniqueViewed.size;
+
+    return {
+      profileViews: {
+        used: viewsUsed,
+        limit: FREE_DAILY_PROFILE_VIEW_LIMIT,
+        remaining: Math.max(0, FREE_DAILY_PROFILE_VIEW_LIMIT - viewsUsed),
+      },
+      messages: {
+        used: 0, // TODO: implement message tracking
+        limit: FREE_DAILY_MESSAGE_LIMIT,
+        remaining: FREE_DAILY_MESSAGE_LIMIT,
+      },
+    };
   },
 });

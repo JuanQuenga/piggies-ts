@@ -339,6 +339,122 @@ export const listConversations = query({
   },
 });
 
+// Get recent conversations for home page (simplified, no pagination)
+export const getRecentConversations = query({
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("conversations"),
+      lastMessageTime: v.optional(v.number()),
+      lastMessage: v.union(
+        v.object({
+          _id: v.id("messages"),
+          content: v.string(),
+          format: v.union(
+            v.literal("text"),
+            v.literal("image"),
+            v.literal("video"),
+            v.literal("gif"),
+            v.literal("location")
+          ),
+          senderId: v.id("users"),
+          sentAt: v.number(),
+        }),
+        v.null()
+      ),
+      otherParticipant: v.object({
+        _id: v.id("users"),
+        name: v.string(),
+        imageUrl: v.optional(v.string()),
+        isOnline: v.optional(v.boolean()),
+      }),
+      unreadCount: v.number(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 5;
+
+    // Get all conversations, ordered by last message time
+    const allConversations = await ctx.db
+      .query("conversations")
+      .withIndex("by_lastMessageTime")
+      .order("desc")
+      .collect();
+
+    // Filter to only this user's conversations
+    const userConversations = allConversations
+      .filter((c) => c.participantIds.includes(args.userId))
+      .slice(0, limit);
+
+    // Enrich with other participant info and last message
+    const conversationsWithDetails = await Promise.all(
+      userConversations.map(async (conversation) => {
+        const otherParticipantId = conversation.participantIds.find(
+          (id) => id !== args.userId
+        );
+
+        if (!otherParticipantId) return null;
+
+        const otherUser = await ctx.db.get(otherParticipantId);
+        if (!otherUser) return null;
+
+        const otherProfile = await ctx.db
+          .query("profiles")
+          .withIndex("by_userId", (q) => q.eq("userId", otherParticipantId))
+          .unique();
+
+        // Get last message
+        let lastMessage = null;
+        if (conversation.lastMessageId) {
+          const message = await ctx.db.get(conversation.lastMessageId);
+          if (message) {
+            lastMessage = {
+              _id: message._id,
+              content: message.content,
+              format: message.format,
+              senderId: message.senderId,
+              sentAt: message.sentAt,
+            };
+          }
+        }
+
+        // Count unread messages
+        const unreadMessages = await ctx.db
+          .query("messages")
+          .withIndex("by_conversation", (q) =>
+            q.eq("conversationId", conversation._id)
+          )
+          .filter((q) => q.neq(q.field("senderId"), args.userId))
+          .collect();
+
+        const unreadCount = unreadMessages.filter(
+          (msg) => !msg.readAt || !msg.readAt[args.userId]
+        ).length;
+
+        return {
+          _id: conversation._id,
+          lastMessageTime: conversation.lastMessageTime,
+          lastMessage,
+          otherParticipant: {
+            _id: otherParticipantId,
+            name: otherProfile?.displayName ?? otherUser.name,
+            imageUrl: otherUser.imageUrl,
+            isOnline: otherUser.isOnline,
+          },
+          unreadCount,
+        };
+      })
+    );
+
+    return conversationsWithDetails.filter(
+      (c): c is NonNullable<typeof c> => c !== null
+    );
+  },
+});
+
 // Mark messages as read
 export const markMessagesRead = mutation({
   args: {

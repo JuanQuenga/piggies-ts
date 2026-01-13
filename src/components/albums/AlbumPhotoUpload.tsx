@@ -11,6 +11,7 @@ const ULTRA_LIMIT = 25 * 1024 * 1024 // 25MB
 
 interface AlbumPhotoUploadProps {
   userId: Id<"users">
+  albumId?: Id<"privateAlbums">
   isUltra: boolean
   onSuccess?: () => void
   onCancel?: () => void
@@ -18,6 +19,7 @@ interface AlbumPhotoUploadProps {
 
 export function AlbumPhotoUpload({
   userId,
+  albumId,
   isUltra,
   onSuccess,
   onCancel,
@@ -79,6 +81,7 @@ export function AlbumPhotoUpload({
 
       await addPhotoToAlbum({
         userId,
+        albumId,
         storageId,
       })
 

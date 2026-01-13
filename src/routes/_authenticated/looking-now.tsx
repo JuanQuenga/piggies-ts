@@ -27,6 +27,8 @@ import {
   Sparkles,
   Lock,
   Send,
+  Home,
+  Car,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/looking-now')({
@@ -43,6 +45,8 @@ function LookingNowPage() {
   const [newPostMessage, setNewPostMessage] = useState('')
   const [editPostMessage, setEditPostMessage] = useState('')
   const [locationName, setLocationName] = useState('')
+  const [canHost, setCanHost] = useState<boolean | undefined>(undefined)
+  const [editCanHost, setEditCanHost] = useState<boolean | undefined>(undefined)
 
   // Queries
   const activePosts = useQuery(
@@ -52,6 +56,11 @@ function LookingNowPage() {
 
   const myActivePost = useQuery(
     api.lookingNow.getMyActivePost,
+    convexUser?._id ? { userId: convexUser._id } : 'skip'
+  )
+
+  const postingStatus = useQuery(
+    api.lookingNow.getPostingStatus,
     convexUser?._id ? { userId: convexUser._id } : 'skip'
   )
 
@@ -73,9 +82,11 @@ function LookingNowPage() {
         userId: convexUser._id,
         message: newPostMessage.trim(),
         locationName: locationName.trim() || undefined,
+        canHost,
       })
       setNewPostMessage('')
       setLocationName('')
+      setCanHost(undefined)
       setCreateDialogOpen(false)
       toast.success('Your post is now live!')
     } catch (error) {
@@ -97,6 +108,7 @@ function LookingNowPage() {
         userId: convexUser._id,
         message: editPostMessage.trim(),
         locationName: locationName.trim() || undefined,
+        canHost: editCanHost,
       })
       setEditDialogOpen(false)
       toast.success('Post updated!')
@@ -148,6 +160,7 @@ function LookingNowPage() {
     if (myActivePost) {
       setEditPostMessage(myActivePost.message)
       setLocationName(myActivePost.locationName || '')
+      setEditCanHost(myActivePost.canHost)
       setEditDialogOpen(true)
     }
   }
@@ -231,12 +244,48 @@ function LookingNowPage() {
               <p className="text-foreground text-lg font-medium">
                 {myActivePost.message}
               </p>
-              {myActivePost.locationName && (
-                <p className="text-muted-foreground text-sm mt-2 flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {myActivePost.locationName}
-                </p>
-              )}
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {myActivePost.locationName && (
+                  <span className="text-muted-foreground text-sm flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {myActivePost.locationName}
+                  </span>
+                )}
+                {myActivePost.canHost === true && (
+                  <Badge variant="outline" className="text-xs">
+                    <Home className="w-3 h-3 mr-1" />
+                    Can Host
+                  </Badge>
+                )}
+                {myActivePost.canHost === false && (
+                  <Badge variant="outline" className="text-xs">
+                    <Car className="w-3 h-3 mr-1" />
+                    Can Travel
+                  </Badge>
+                )}
+              </div>
+            </div>
+          ) : postingStatus && !postingStatus.canPost ? (
+            // Free user has reached daily limit
+            <div className="p-6 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-2xl border border-amber-500/20">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shrink-0">
+                  <Lock className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="font-bold text-lg mb-1">Daily Limit Reached</h2>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Free users can create 1 post per day. Upgrade to Piggies Ultra for unlimited posts and 4-hour visibility!
+                  </p>
+                  <Button
+                    onClick={handleUpgrade}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold"
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Upgrade to Ultra
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : (
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -253,6 +302,11 @@ function LookingNowPage() {
                       <p className="text-sm text-muted-foreground mt-1">
                         Let nearby users know you're available right now
                       </p>
+                      {postingStatus && !postingStatus.isUltra && (
+                        <p className="text-xs text-amber-500 mt-2">
+                          {postingStatus.dailyLimit - postingStatus.postsUsedToday} post remaining today
+                        </p>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -293,11 +347,48 @@ function LookingNowPage() {
                       maxLength={50}
                     />
                   </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">
+                      Hosting
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCanHost(canHost === true ? undefined : true)}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                          canHost === true
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <Home className="w-4 h-4" />
+                        Can Host
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCanHost(canHost === false ? undefined : false)}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                          canHost === false
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <Car className="w-4 h-4" />
+                        Can Travel
+                      </button>
+                    </div>
+                  </div>
                   <div className="bg-muted/50 rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">
                       <Clock className="w-3 h-3 inline mr-1" />
-                      Your post will be visible for 4 hours and then automatically expire.
+                      Your post will be visible for {postingStatus?.postDurationHours || 1} hour{(postingStatus?.postDurationHours || 1) > 1 ? 's' : ''} and then automatically expire.
                     </p>
+                    {postingStatus && !postingStatus.isUltra && (
+                      <p className="text-xs text-amber-500 mt-2">
+                        <Sparkles className="w-3 h-3 inline mr-1" />
+                        Upgrade to Ultra for 4-hour visibility and unlimited posts!
+                      </p>
+                    )}
                   </div>
                   <Button
                     className="w-full"
@@ -350,6 +441,37 @@ function LookingNowPage() {
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                   maxLength={50}
                 />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  Hosting
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditCanHost(editCanHost === true ? undefined : true)}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                      editCanHost === true
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <Home className="w-4 h-4" />
+                    Can Host
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditCanHost(editCanHost === false ? undefined : false)}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                      editCanHost === false
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <Car className="w-4 h-4" />
+                    Can Travel
+                  </button>
+                </div>
               </div>
               <Button
                 className="w-full"
@@ -458,7 +580,7 @@ function LookingNowPage() {
                             )}
                           </div>
                           <p className="text-foreground mb-2">{post.message}</p>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               {formatTimeAgo(post.createdAt)}
@@ -468,6 +590,18 @@ function LookingNowPage() {
                                 <MapPin className="w-3 h-3" />
                                 {post.locationName}
                               </span>
+                            )}
+                            {post.canHost === true && (
+                              <Badge variant="outline" className="text-xs py-0">
+                                <Home className="w-3 h-3 mr-1" />
+                                Can Host
+                              </Badge>
+                            )}
+                            {post.canHost === false && (
+                              <Badge variant="outline" className="text-xs py-0">
+                                <Car className="w-3 h-3 mr-1" />
+                                Can Travel
+                              </Badge>
                             )}
                           </div>
                         </div>

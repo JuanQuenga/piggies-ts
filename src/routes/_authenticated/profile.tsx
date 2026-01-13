@@ -131,7 +131,7 @@ function ProfilePage() {
         interests: selectedInterests,
       })
       toast.success('Profile updated successfully')
-      navigate({ to: '/home' })
+      navigate({ to: '/nearby' })
     } catch {
       toast.error('Failed to update profile')
     } finally {
@@ -164,7 +164,7 @@ function ProfilePage() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border">
         <div className="flex items-center justify-between h-14 px-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/home' })}>
+          <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/nearby' })}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="font-bold text-lg">Edit Profile</h1>

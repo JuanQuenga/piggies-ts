@@ -9,6 +9,7 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as admirers from "../admirers.js";
 import type * as albums from "../albums.js";
 import type * as crons from "../crons.js";
 import type * as dev from "../dev.js";
@@ -25,6 +26,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  admirers: typeof admirers;
   albums: typeof albums;
   crons: typeof crons;
   dev: typeof dev;

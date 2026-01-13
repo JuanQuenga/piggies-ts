@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import {
   Dialog,
@@ -18,16 +19,20 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   ImageIcon,
   Share2,
   X,
-  Clock,
   Loader2,
   Check,
   Sparkles,
+  FolderOpen,
+  Lock,
+  Image,
 } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 interface AlbumShareButtonProps {
   userId: Id<"users">
@@ -42,6 +47,13 @@ export function AlbumShareButton({
 }: AlbumShareButtonProps) {
   const [showConfirm, setShowConfirm] = useState(false)
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false)
+  const [showAlbumPicker, setShowAlbumPicker] = useState(false)
+  const [selectedAlbumId, setSelectedAlbumId] = useState<Id<"privateAlbums"> | null>(null)
+  const [selectedAlbumName, setSelectedAlbumName] = useState<string>("")
+  const [albumToRevoke, setAlbumToRevoke] = useState<{
+    id: Id<"privateAlbums"> | undefined
+    name: string
+  } | null>(null)
   const [selectedDuration, setSelectedDuration] = useState<"indefinite" | "24h" | "7d">("indefinite")
   const [isLoading, setIsLoading] = useState(false)
 
@@ -50,8 +62,20 @@ export function AlbumShareButton({
     conversationId,
   })
 
+  const albums = useQuery(api.albums.listMyAlbums, { userId })
+
   const shareAlbum = useMutation(api.albums.shareAlbum)
   const revokeAccess = useMutation(api.albums.revokeAlbumAccess)
+
+  // Get already shared album IDs
+  const sharedAlbumIds = sharingStatus?.mySharedAlbums
+    ?.map((a) => a.albumId)
+    .filter((id): id is Id<"privateAlbums"> => id !== undefined) ?? []
+
+  // Available albums to share (not already shared)
+  const availableAlbums = albums?.filter(
+    (album) => !sharedAlbumIds.includes(album._id)
+  ) ?? []
 
   const handleShare = async () => {
     if (!sharingStatus?.otherUserId) return
@@ -59,13 +83,16 @@ export function AlbumShareButton({
     setIsLoading(true)
     try {
       await shareAlbum({
+        albumId: selectedAlbumId ?? undefined,
         ownerUserId: userId,
         grantedUserId: sharingStatus.otherUserId,
         conversationId,
         expiresIn: selectedDuration === "indefinite" ? undefined : selectedDuration,
       })
-      toast.success("Album shared successfully")
+      toast.success(`${selectedAlbumName || "Album"} shared successfully`)
       setShowConfirm(false)
+      setSelectedAlbumId(null)
+      setSelectedAlbumName("")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to share album")
     } finally {
@@ -74,21 +101,30 @@ export function AlbumShareButton({
   }
 
   const handleRevoke = async () => {
-    if (!sharingStatus?.otherUserId) return
+    if (!sharingStatus?.otherUserId || !albumToRevoke) return
 
     setIsLoading(true)
     try {
       await revokeAccess({
         ownerUserId: userId,
         grantedUserId: sharingStatus.otherUserId,
+        albumId: albumToRevoke.id,
       })
-      toast.success("Album access revoked")
+      toast.success(`Access to ${albumToRevoke.name} revoked`)
       setShowRevokeConfirm(false)
+      setAlbumToRevoke(null)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to revoke access")
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSelectAlbumToShare = (album: { _id: Id<"privateAlbums">; name: string }) => {
+    setSelectedAlbumId(album._id)
+    setSelectedAlbumName(album.name)
+    setShowAlbumPicker(false)
+    setShowConfirm(true)
   }
 
   const formatExpiry = (expiresAt?: number) => {
@@ -102,8 +138,8 @@ export function AlbumShareButton({
     return `${hours}h left`
   }
 
-  const iShared = sharingStatus?.iShared ?? false
-  const expiryText = formatExpiry(sharingStatus?.myShareExpiresAt)
+  const hasSharedAlbums = (sharingStatus?.mySharedAlbums?.length ?? 0) > 0
+  const sharedAlbumCount = sharingStatus?.mySharedAlbums?.length ?? 0
 
   return (
     <>
@@ -115,70 +151,170 @@ export function AlbumShareButton({
             className="relative"
           >
             <ImageIcon className="w-5 h-5" />
-            {iShared && (
+            {hasSharedAlbums && (
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
             )}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          {iShared ? (
+        <DropdownMenuContent align="end" className="w-64">
+          {/* Shared Albums Section */}
+          {hasSharedAlbums && (
             <>
-              <div className="px-2 py-1.5 text-sm">
-                <div className="flex items-center gap-2 text-green-600">
-                  <Check className="w-4 h-4" />
-                  <span>Album Shared</span>
+              <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Check className="w-3 h-3" />
+                Shared ({sharedAlbumCount})
+              </DropdownMenuLabel>
+              {sharingStatus?.mySharedAlbums?.map((share) => (
+                <div
+                  key={share.grantId}
+                  className="px-2 py-1.5 text-sm flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Lock className="w-3 h-3 text-green-500 shrink-0" />
+                    <span className="truncate">{share.albumName}</span>
+                    {share.expiresAt && (
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        ({formatExpiry(share.expiresAt)})
+                      </span>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="w-6 h-6 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => {
+                      setAlbumToRevoke({
+                        id: share.albumId,
+                        name: share.albumName,
+                      })
+                      setShowRevokeConfirm(true)
+                    }}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
                 </div>
-                {expiryText && (
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {expiryText}
-                  </p>
-                )}
-              </div>
+              ))}
               <DropdownMenuSeparator />
-              {isUltra && (
-                <DropdownMenuItem onClick={() => setShowConfirm(true)}>
-                  <Clock className="w-4 h-4 mr-2" />
-                  Update Access Duration
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onClick={() => setShowRevokeConfirm(true)}
-                className="text-destructive focus:text-destructive"
-              >
-                <X className="w-4 h-4 mr-2" />
-                Revoke Access
-              </DropdownMenuItem>
             </>
-          ) : (
-            <>
-              <DropdownMenuItem onClick={() => setShowConfirm(true)}>
+          )}
+
+          {/* Share New Album */}
+          {availableAlbums.length > 0 ? (
+            isUltra ? (
+              <DropdownMenuItem onClick={() => setShowAlbumPicker(true)}>
+                <Share2 className="w-4 h-4 mr-2" />
+                Share an Album
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                onClick={() => {
+                  // For free users, share default album directly
+                  const defaultAlbum = albums?.find((a) => a.isDefault)
+                  if (defaultAlbum) {
+                    setSelectedAlbumId(defaultAlbum._id)
+                    setSelectedAlbumName(defaultAlbum.name)
+                    setShowConfirm(true)
+                  }
+                }}
+              >
                 <Share2 className="w-4 h-4 mr-2" />
                 Share My Album
               </DropdownMenuItem>
-              {!isUltra && (
-                <>
-                  <DropdownMenuSeparator />
-                  <div className="px-2 py-1.5">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-amber-500" />
-                      <span>Ultra: Time-limited sharing</span>
-                    </p>
-                  </div>
-                </>
-              )}
+            )
+          ) : (
+            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+              {albums?.length === 0
+                ? "No albums to share"
+                : "All albums shared"}
+            </div>
+          )}
+
+          {/* Ultra Upsell */}
+          {!isUltra && (
+            <>
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1.5">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  <span>Ultra: Multiple albums & time-limits</span>
+                </p>
+              </div>
             </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* Album Picker Dialog (Ultra only) */}
+      <Dialog open={showAlbumPicker} onOpenChange={setShowAlbumPicker}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderOpen className="w-5 h-5" />
+              Select Album to Share
+            </DialogTitle>
+            <DialogDescription>
+              Choose which album to share with this user
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[300px]">
+            <div className="space-y-2 p-1">
+              {availableAlbums.map((album) => (
+                <button
+                  key={album._id}
+                  onClick={() => handleSelectAlbumToShare(album)}
+                  className={cn(
+                    "w-full flex items-center gap-3 p-3 rounded-xl border transition-colors",
+                    "border-border hover:border-foreground/20 hover:bg-muted/50"
+                  )}
+                >
+                  {/* Album thumbnail */}
+                  <div className="w-12 h-12 rounded-lg bg-muted shrink-0 overflow-hidden">
+                    {album.coverUrl ? (
+                      <img
+                        src={album.coverUrl}
+                        alt={album.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Image className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Album info */}
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{album.name}</span>
+                      {album.isDefault && (
+                        <Lock className="w-3 h-3 text-muted-foreground shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAlbumPicker(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Share Confirmation Dialog */}
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Share Your Private Album</DialogTitle>
+            <DialogTitle>Share "{selectedAlbumName || "Private Album"}"</DialogTitle>
             <DialogDescription>
-              This user will be able to view all photos in your private album.
+              This user will be able to view all photos in this album.
             </DialogDescription>
           </DialogHeader>
 
@@ -223,7 +359,11 @@ export function AlbumShareButton({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowConfirm(false)}
+              onClick={() => {
+                setShowConfirm(false)
+                setSelectedAlbumId(null)
+                setSelectedAlbumName("")
+              }}
               disabled={isLoading}
             >
               Cancel
@@ -251,13 +391,16 @@ export function AlbumShareButton({
           <DialogHeader>
             <DialogTitle>Revoke Album Access</DialogTitle>
             <DialogDescription>
-              This user will no longer be able to view your private album. You can share it again anytime.
+              This user will no longer be able to view "{albumToRevoke?.name}". You can share it again anytime.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowRevokeConfirm(false)}
+              onClick={() => {
+                setShowRevokeConfirm(false)
+                setAlbumToRevoke(null)
+              }}
               disabled={isLoading}
             >
               Cancel

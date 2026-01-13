@@ -192,7 +192,7 @@ function UserProfilePage() {
       })
       setShowBlockDialog(false)
       toast.success('User blocked successfully')
-      navigate({ to: '/home' })
+      navigate({ to: '/nearby' })
     } catch {
       toast.error('Failed to block user')
     }
@@ -234,7 +234,7 @@ function UserProfilePage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate({ to: '/home' })}
+            onClick={() => navigate({ to: '/nearby' })}
             className="gap-2"
           >
             <ArrowLeft className="w-4 h-4" />

@@ -1,13 +1,15 @@
 import { createFileRoute, Outlet, redirect, useNavigate, useLocation } from '@tanstack/react-router'
 import { getAuth, getSignInUrl, signOut } from '@workos/authkit-tanstack-react-start'
-import { useQuery } from 'convex/react'
+import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav'
 import { AppHeader } from '@/components/navigation/AppHeader'
-import { Ban, Clock, AlertTriangle } from 'lucide-react'
+import { Ban, Clock, AlertTriangle, MapPin, Navigation, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
+import type { Id } from '../../convex/_generated/dataModel'
 
 export const Route = createFileRoute('/_authenticated')({
   loader: async ({ location }) => {
@@ -52,7 +54,7 @@ function AuthenticatedLayout() {
     if (needsOnboarding && !isOnboardingPage) {
       navigate({ to: '/onboarding' })
     } else if (!needsOnboarding && isOnboardingPage) {
-      navigate({ to: '/home' })
+      navigate({ to: '/nearby' })
     }
   }, [profile, convexUser, isLoading, location.pathname, navigate])
 
@@ -78,6 +80,12 @@ function AuthenticatedLayout() {
   // Check if user is suspended (and suspension hasn't expired)
   if (convexUser?.isSuspended && convexUser.suspendedUntil && convexUser.suspendedUntil > Date.now()) {
     return <SuspendedScreen suspendedUntil={convexUser.suspendedUntil} />
+  }
+
+  // Check if user needs to set their location (only after onboarding is complete)
+  const needsLocation = profile && profile.onboardingComplete && !profile.locationName
+  if (needsLocation && convexUser) {
+    return <LocationRequiredScreen userId={convexUser._id} />
   }
 
   // Hide nav elements on certain pages
@@ -209,6 +217,115 @@ function SuspendedScreen({ suspendedUntil }: { suspendedUntil: number }) {
           <Button onClick={handleSignOut} variant="outline" className="w-full">
             Sign Out
           </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Location required screen
+function LocationRequiredScreen({ userId }: { userId: Id<'users'> }) {
+  const updateLocation = useMutation(api.users.updateLocation)
+  const [isGettingLocation, setIsGettingLocation] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser. Please use a different device or browser.')
+      return
+    }
+
+    setIsGettingLocation(true)
+    setError(null)
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+        // Get city name from coordinates using reverse geocoding
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`,
+          )
+          const data = await response.json()
+          const city =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.village ||
+            data.address?.county ||
+            'Unknown Location'
+
+          await updateLocation({
+            userId,
+            latitude,
+            longitude,
+            locationName: city,
+          })
+          toast.success('Location set successfully!')
+        } catch {
+          setError('Failed to get location details. Please try again.')
+        }
+        setIsGettingLocation(false)
+      },
+      (error) => {
+        setIsGettingLocation(false)
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setError('Location access denied. Please enable location permissions in your browser settings and try again.')
+            break
+          case error.POSITION_UNAVAILABLE:
+            setError('Location information is unavailable. Please try again.')
+            break
+          case error.TIMEOUT:
+            setError('Location request timed out. Please try again.')
+            break
+          default:
+            setError('Unable to get your location. Please try again.')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="max-w-md w-full text-center">
+        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+          <MapPin className="w-10 h-10 text-primary" />
+        </div>
+
+        <h1 className="text-2xl font-bold mb-2">Enable Location</h1>
+        <p className="text-muted-foreground mb-6">
+          Piggies uses your location to show you people nearby. Location access is required to use the app.
+        </p>
+
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 mb-6 text-left">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <Button
+            onClick={handleUseMyLocation}
+            disabled={isGettingLocation}
+            className="w-full"
+            size="lg"
+          >
+            {isGettingLocation ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Getting Location...
+              </>
+            ) : (
+              <>
+                <Navigation className="w-4 h-4 mr-2" />
+                Enable Location Access
+              </>
+            )}
+          </Button>
+
+          <p className="text-xs text-muted-foreground">
+            Your location helps you discover people in your area. You can update it anytime from your profile.
+          </p>
         </div>
       </div>
     </div>

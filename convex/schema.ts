@@ -67,6 +67,7 @@ export default defineSchema({
     // Location
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
+    locationName: v.optional(v.string()),
     
     // Onboarding
     onboardingComplete: v.optional(v.boolean()),
@@ -162,22 +163,41 @@ export default defineSchema({
     .index("by_user_favorite", ["userId", "favoriteId"]),
 
   // ============================================================================
+  // PRIVATE ALBUMS TABLE (Ultra feature - multiple named albums)
+  // ============================================================================
+  privateAlbums: defineTable({
+    userId: v.id("users"), // Owner of the album
+    name: v.string(), // Album name (e.g., "Vacation", "Beach Trip")
+    description: v.optional(v.string()), // Optional description
+    coverPhotoId: v.optional(v.id("privateAlbumPhotos")), // Cover photo reference
+    isDefault: v.boolean(), // Is this the user's default album? (for backwards compat)
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_isDefault", ["userId", "isDefault"]),
+
+  // ============================================================================
   // PRIVATE ALBUM PHOTOS TABLE
   // ============================================================================
   privateAlbumPhotos: defineTable({
     userId: v.id("users"), // Owner of the photo
+    albumId: v.optional(v.id("privateAlbums")), // Album this photo belongs to (optional for migration)
     storageId: v.id("_storage"), // Convex storage reference
     caption: v.optional(v.string()), // Optional caption
     uploadedAt: v.number(), // Upload timestamp
     order: v.number(), // For ordering photos in album
   })
     .index("by_userId", ["userId"])
-    .index("by_userId_order", ["userId", "order"]),
+    .index("by_userId_order", ["userId", "order"])
+    .index("by_albumId", ["albumId"])
+    .index("by_albumId_order", ["albumId", "order"]),
 
   // ============================================================================
   // ALBUM ACCESS GRANTS TABLE
   // ============================================================================
   albumAccessGrants: defineTable({
+    albumId: v.optional(v.id("privateAlbums")), // Specific album being shared (optional for migration)
     ownerUserId: v.id("users"), // User who owns the album
     grantedUserId: v.id("users"), // User who has access
     conversationId: v.id("conversations"), // Conversation where access was granted
@@ -188,7 +208,9 @@ export default defineSchema({
     .index("by_owner", ["ownerUserId"])
     .index("by_granted", ["grantedUserId"])
     .index("by_owner_granted", ["ownerUserId", "grantedUserId"])
-    .index("by_conversation", ["conversationId"]),
+    .index("by_conversation", ["conversationId"])
+    .index("by_album_granted", ["albumId", "grantedUserId"])
+    .index("by_album", ["albumId"]),
 
   // ============================================================================
   // REFERRALS TABLE
@@ -223,6 +245,32 @@ export default defineSchema({
     .index("by_userId", ["userId"]),
 
   // ============================================================================
+  // PROFILE VIEWS TABLE (for tracking daily views)
+  // ============================================================================
+  profileViews: defineTable({
+    viewerId: v.id("users"),         // User who viewed the profile
+    viewedId: v.id("users"),         // User whose profile was viewed
+    viewedAt: v.number(),            // Timestamp of the view
+    date: v.string(),                // Date string (YYYY-MM-DD) for daily tracking
+  })
+    .index("by_viewer", ["viewerId"])
+    .index("by_viewed", ["viewedId"])
+    .index("by_viewer_date", ["viewerId", "date"])
+    .index("by_viewer_viewed", ["viewerId", "viewedId"]),
+
+  // ============================================================================
+  // WAVES TABLE
+  // ============================================================================
+  waves: defineTable({
+    waverId: v.id("users"),           // User who sent the wave
+    wavedAtId: v.id("users"),         // User who received the wave
+    wavedAt: v.number(),              // Timestamp of the wave
+  })
+    .index("by_waver", ["waverId"])
+    .index("by_wavedAt", ["wavedAtId"])
+    .index("by_waver_wavedAt", ["waverId", "wavedAtId"]),
+
+  // ============================================================================
   // LOOKING NOW POSTS TABLE
   // ============================================================================
   lookingNowPosts: defineTable({
@@ -231,6 +279,7 @@ export default defineSchema({
     latitude: v.optional(v.number()),    // Location coordinates
     longitude: v.optional(v.number()),   // Location coordinates
     locationName: v.optional(v.string()),// Display name for location (e.g., "Downtown")
+    canHost: v.optional(v.boolean()),    // Whether the user can host (true = can host, false = can't host, undefined = not specified)
     createdAt: v.number(),               // When the post was created
     expiresAt: v.number(),               // When the post expires (auto-delete after X hours)
     isActive: v.boolean(),               // Whether the post is still active

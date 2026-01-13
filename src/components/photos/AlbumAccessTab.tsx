@@ -18,6 +18,7 @@ import {
   ShieldOff,
   Clock,
   UserX,
+  Lock,
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "@/lib/date-utils"
@@ -27,20 +28,29 @@ interface AlbumAccessTabProps {
 }
 
 export function AlbumAccessTab({ userId }: AlbumAccessTabProps) {
-  const [userToRevoke, setUserToRevoke] = useState<{ id: Id<"users">; name: string } | null>(null)
+  const [shareToRevoke, setShareToRevoke] = useState<{
+    userId: Id<"users">
+    albumId?: Id<"privateAlbums">
+    userName: string
+    albumName: string
+  } | null>(null)
   const [isRevoking, setIsRevoking] = useState(false)
 
   const albumShares = useQuery(api.albums.getMyAlbumShares, { userId })
   const revokeAccess = useMutation(api.albums.revokeAlbumAccess)
 
   const handleRevoke = async () => {
-    if (!userToRevoke) return
+    if (!shareToRevoke) return
 
     setIsRevoking(true)
     try {
-      await revokeAccess({ ownerUserId: userId, grantedUserId: userToRevoke.id })
-      toast.success(`Access revoked for ${userToRevoke.name}`)
-      setUserToRevoke(null)
+      await revokeAccess({
+        ownerUserId: userId,
+        grantedUserId: shareToRevoke.userId,
+        albumId: shareToRevoke.albumId,
+      })
+      toast.success(`Access to ${shareToRevoke.albumName} revoked for ${shareToRevoke.userName}`)
+      setShareToRevoke(null)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to revoke access")
     } finally {
@@ -70,7 +80,7 @@ export function AlbumAccessTab({ userId }: AlbumAccessTabProps) {
           Album Access
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          People who can view your private album
+          People who can view your private albums
         </p>
       </div>
 
@@ -108,12 +118,16 @@ export function AlbumAccessTab({ userId }: AlbumAccessTabProps) {
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{share.grantedUser.name}</p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                    <Lock className="w-3 h-3" />
+                    <span className="truncate">{share.albumName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
                     <span>Shared {formatDistanceToNow(share.grantedAt)} ago</span>
                     {expiration && (
                       <>
                         <span>-</span>
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 text-amber-500">
                           <Clock className="w-3 h-3" />
                           {expiration}
                         </span>
@@ -125,7 +139,14 @@ export function AlbumAccessTab({ userId }: AlbumAccessTabProps) {
                   variant="outline"
                   size="sm"
                   className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => setUserToRevoke({ id: share.grantedUser._id, name: share.grantedUser.name })}
+                  onClick={() =>
+                    setShareToRevoke({
+                      userId: share.grantedUser._id,
+                      albumId: share.albumId ?? undefined,
+                      userName: share.grantedUser.name,
+                      albumName: share.albumName,
+                    })
+                  }
                 >
                   <ShieldOff className="w-4 h-4 mr-1" />
                   Revoke
@@ -137,18 +158,18 @@ export function AlbumAccessTab({ userId }: AlbumAccessTabProps) {
       )}
 
       {/* Revoke confirmation dialog */}
-      <Dialog open={!!userToRevoke} onOpenChange={() => setUserToRevoke(null)}>
+      <Dialog open={!!shareToRevoke} onOpenChange={() => setShareToRevoke(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Revoke Access</DialogTitle>
             <DialogDescription>
-              Are you sure you want to revoke {userToRevoke?.name}'s access to your private album? They will no longer be able to view your photos.
+              Are you sure you want to revoke {shareToRevoke?.userName}'s access to "{shareToRevoke?.albumName}"? They will no longer be able to view this album.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setUserToRevoke(null)}
+              onClick={() => setShareToRevoke(null)}
               disabled={isRevoking}
             >
               Cancel

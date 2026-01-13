@@ -180,7 +180,7 @@ function OnboardingPage() {
         onboardingComplete: true,
       })
       toast.success('Welcome to Piggies!')
-      navigate({ to: '/home' })
+      navigate({ to: '/nearby' })
     } catch {
       toast.error('Failed to complete setup. Please try again.')
     } finally {

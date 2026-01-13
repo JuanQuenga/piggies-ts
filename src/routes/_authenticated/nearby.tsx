@@ -34,6 +34,7 @@ import {
   Navigation,
   Loader2,
   Check,
+  Telescope,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -46,15 +47,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 
-type HomeSearch = {
-  openLocation?: boolean
-}
-
-export const Route = createFileRoute('/_authenticated/home')({
-  component: HomePage,
-  validateSearch: (search: Record<string, unknown>): HomeSearch => ({
-    openLocation: search.openLocation === true || search.openLocation === 'true',
-  }),
+export const Route = createFileRoute('/_authenticated/nearby')({
+  component: NearbyPage,
 })
 
 type NearbyUser = {
@@ -76,14 +70,14 @@ type NearbyUser = {
 }
 
 // Profile limits based on subscription
-const FREE_PROFILE_LIMIT = 1
+const FREE_PROFILE_LIMIT = 10
 const ULTRA_PROFILE_LIMIT = 100
+const FREE_DAILY_VIEW_LIMIT = 5
 
-function HomePage() {
+function NearbyPage() {
   const { user: convexUser } = useCurrentUser()
   const { checkoutUrl, isUltra } = useSubscription()
   const navigate = useNavigate()
-  const { openLocation } = Route.useSearch()
   const [selectedUser, setSelectedUser] = useState<NearbyUser | null>(null)
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
   const [viewMode, setViewMode] = useState<'grid' | 'detailed'>(() => {
@@ -160,6 +154,41 @@ function HomePage() {
       return null
     },
   )
+  // Store actual coordinates for nearby mode
+  const [nearbyCoords, setNearbyCoords] = useState<{
+    latitude: number
+    longitude: number
+  } | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('piggies-nearby-coords')
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch {
+          return null
+        }
+      }
+    }
+    return null
+  })
+  // Store coordinates for custom location too
+  const [customCoords, setCustomCoords] = useState<{
+    latitude: number
+    longitude: number
+  } | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('piggies-custom-coords')
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch {
+          return null
+        }
+      }
+    }
+    return null
+  })
+  const [isSettingCustomLocation, setIsSettingCustomLocation] = useState(false)
 
   // Persist location preference
   useEffect(() => {
@@ -170,16 +199,13 @@ function HomePage() {
     if (nearbyLocationName) {
       localStorage.setItem('piggies-nearby-location', nearbyLocationName)
     }
-  }, [locationType, customLocation, nearbyLocationName])
-
-  // Handle openLocation search param from header
-  useEffect(() => {
-    if (openLocation) {
-      setLocationDialogOpen(true)
-      // Clear the search param
-      navigate({ to: '/home', search: {}, replace: true })
+    if (nearbyCoords) {
+      localStorage.setItem('piggies-nearby-coords', JSON.stringify(nearbyCoords))
     }
-  }, [openLocation, navigate])
+    if (customCoords) {
+      localStorage.setItem('piggies-custom-coords', JSON.stringify(customCoords))
+    }
+  }, [locationType, customLocation, nearbyLocationName, nearbyCoords, customCoords])
 
   const getLocationDisplayText = () => {
     if (locationType === 'nearby') {
@@ -198,6 +224,8 @@ function HomePage() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords
+        // Save the coordinates
+        setNearbyCoords({ latitude, longitude })
         // Try to get city name from coordinates using reverse geocoding
         try {
           const response = await fetch(
@@ -241,20 +269,88 @@ function HomePage() {
     )
   }
 
-  const handleSetCustomLocation = () => {
+  const handleSetCustomLocation = async () => {
     if (!customLocationInput.trim()) {
       toast.error('Please enter a city or zip code')
       return
     }
-    setCustomLocation(customLocationInput.trim())
-    setLocationType('custom')
-    setLocationDialogOpen(false)
-    toast.success('Location updated!')
+
+    setIsSettingCustomLocation(true)
+
+    try {
+      // Geocode the input to get coordinates and proper city name
+      // Use countrycodes=us to restrict to US locations
+      const searchQuery = customLocationInput.trim()
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&addressdetails=1&countrycodes=us`,
+      )
+      const data = await response.json()
+
+      if (!data || data.length === 0) {
+        toast.error('Location not found. Please try a different city or zip code.')
+        setIsSettingCustomLocation(false)
+        return
+      }
+
+      // Find the best result - prefer cities/towns over other types
+      const result = data.find(
+        (r: { type?: string; class?: string }) =>
+          r.type === 'city' ||
+          r.type === 'town' ||
+          r.type === 'village' ||
+          r.type === 'administrative' ||
+          r.class === 'place'
+      ) || data[0]
+
+      const lat = parseFloat(result.lat)
+      const lon = parseFloat(result.lon)
+
+      // Extract the best city name from the result
+      const cityName =
+        result.address?.city ||
+        result.address?.town ||
+        result.address?.village ||
+        result.address?.municipality ||
+        result.address?.county ||
+        result.name ||
+        searchQuery
+
+      // Store coordinates and proper city name
+      setCustomCoords({ latitude: lat, longitude: lon })
+      setCustomLocation(cityName)
+      setLocationType('custom')
+      setLocationDialogOpen(false)
+      setCustomLocationInput('')
+      toast.success(`Location set to ${cityName}!`)
+    } catch (error) {
+      console.error('Geocoding error:', error)
+      toast.error('Failed to find location. Please try again.')
+    } finally {
+      setIsSettingCustomLocation(false)
+    }
   }
 
   // Get nearby users from Convex (including self)
   // Ultra members see more profiles
   const profileLimit = isUltra ? ULTRA_PROFILE_LIMIT : FREE_PROFILE_LIMIT
+
+  // Determine location parameters for the query
+  const locationParams =
+    locationType === 'nearby' && nearbyCoords
+      ? {
+          latitude: nearbyCoords.latitude,
+          longitude: nearbyCoords.longitude,
+          maxDistanceMiles: 50, // Default max distance for nearby mode
+        }
+      : locationType === 'custom' && customCoords
+        ? {
+            latitude: customCoords.latitude,
+            longitude: customCoords.longitude,
+            maxDistanceMiles: 50, // Same distance for custom location
+            locationName: customLocation, // Also pass name for text matching fallback
+          }
+        : {}
+
   const nearbyUsersRaw = useQuery(
     api.users.getNearbyUsers,
     convexUser?._id
@@ -267,6 +363,7 @@ function HomePage() {
           maxAge: ageFilter?.max,
           interests: interestFilter.length > 0 ? interestFilter : undefined,
           includeSelf: true,
+          ...locationParams,
         }
       : 'skip',
   )
@@ -318,8 +415,57 @@ function HomePage() {
   // Start conversation mutation
   const startConversation = useMutation(api.messages.startConversation)
 
+  // Profile view tracking for free users
+  const recordProfileView = useMutation(api.users.recordProfileView)
+  const dailyLimits = useQuery(
+    api.users.getDailyLimits,
+    convexUser?._id ? { userId: convexUser._id } : 'skip',
+  )
+
+  // State for showing limit reached modal
+  const [showLimitModal, setShowLimitModal] = useState(false)
+
   const handleGoToMessages = () => {
     navigate({ to: '/messages' })
+  }
+
+  // Handle clicking on a user profile (with limit checking for free users in explore mode)
+  const handleViewProfile = async (userId: Id<'users'>, isSelf?: boolean) => {
+    if (isSelf) {
+      navigate({ to: '/profile' })
+      return
+    }
+
+    // Ultra users have no limits
+    if (isUltra) {
+      navigate({ to: '/user/$userId', params: { userId } })
+      return
+    }
+
+    // View limits only apply in explore (custom location) mode
+    // When browsing nearby users, free users have unlimited views
+    if (locationType === 'custom' && convexUser?._id) {
+      try {
+        const result = await recordProfileView({
+          viewerId: convexUser._id,
+          viewedId: userId,
+        })
+
+        if (result.limitReached && result.viewsToday > FREE_DAILY_VIEW_LIMIT) {
+          setShowLimitModal(true)
+          return
+        }
+
+        navigate({ to: '/user/$userId', params: { userId } })
+      } catch (error) {
+        console.error('Failed to record profile view:', error)
+        // Still allow navigation on error
+        navigate({ to: '/user/$userId', params: { userId } })
+      }
+    } else {
+      // Nearby mode - no view limits for free users
+      navigate({ to: '/user/$userId', params: { userId } })
+    }
   }
 
   const handleMessageUser = async (userId: Id<'users'>) => {
@@ -378,10 +524,27 @@ function HomePage() {
           )}
         </Button>
 
+        {/* Daily Views Indicator for Free Users - only in explore (custom location) mode */}
+        {!isUltra && dailyLimits && locationType === 'custom' && (
+          <div
+            className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full px-3 py-1.5 shrink-0 cursor-pointer hover:bg-amber-500/20 transition-colors"
+            onClick={() => checkoutUrl && (window.location.href = checkoutUrl)}
+          >
+            <Eye className="w-4 h-4 text-amber-500" />
+            <span className="text-xs font-medium text-amber-600">
+              {dailyLimits.profileViews.remaining}/{dailyLimits.profileViews.limit} views
+            </span>
+          </div>
+        )}
+
         {/* Location Selector - hidden on mobile (shown in header) */}
         <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
           <DialogTrigger className="hidden sm:flex items-center gap-2 bg-card border border-border rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer shrink-0">
-            <MapPin className="w-4 h-4 text-primary" />
+            {locationType === 'custom' ? (
+              <Telescope className="w-4 h-4 text-primary" />
+            ) : (
+              <MapPin className="w-4 h-4 text-primary" />
+            )}
             <span className="text-sm font-medium truncate max-w-[100px]">
               {getLocationDisplayText()}
             </span>
@@ -432,23 +595,35 @@ function HomePage() {
 
               {/* City/Zip Input */}
               <div className="space-y-3">
-                <p className="font-semibold text-foreground">
-                  Enter City or Zip Code
-                </p>
+                <div className="flex items-center gap-2">
+                  <Telescope className="w-5 h-5 text-primary" />
+                  <p className="font-semibold text-foreground">
+                    Enter City or Zip Code
+                  </p>
+                </div>
                 <div className="flex gap-2">
                   <Input
                     placeholder="e.g., Miami or 33101"
                     value={customLocationInput}
                     onChange={(e) => setCustomLocationInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === 'Enter' && !isSettingCustomLocation) {
                         handleSetCustomLocation()
                       }
                     }}
+                    disabled={isSettingCustomLocation}
                     className="flex-1"
                   />
-                  <Button onClick={handleSetCustomLocation} size="sm">
-                    Set
+                  <Button
+                    onClick={handleSetCustomLocation}
+                    size="sm"
+                    disabled={isSettingCustomLocation}
+                  >
+                    {isSettingCustomLocation ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Set'
+                    )}
                   </Button>
                 </div>
                 {locationType === 'custom' && customLocation && (
@@ -682,7 +857,6 @@ function HomePage() {
           </Button>
         </div>
       </div>
-
       {/* Main Grid */}
       <main className="flex-1 p-2 sm:p-3">
         {nearbyUsers === undefined ? (
@@ -726,17 +900,11 @@ function HomePage() {
           <>
             {viewMode === 'grid' ? (
               /* Grid View */
-              <div className="grid gap-1.5 sm:gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+              (<div className="grid gap-1.5 sm:gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
                 {nearbyUsers.map((nearbyUser) => (
                   <div
                     key={nearbyUser._id}
-                    onClick={() => {
-                      if (nearbyUser.isSelf) {
-                        navigate({ to: '/profile' })
-                      } else {
-                        navigate({ to: '/user/$userId', params: { userId: nearbyUser._id } })
-                      }
-                    }}
+                    onClick={() => handleViewProfile(nearbyUser._id, nearbyUser.isSelf)}
                     className={`profile-card aspect-[3/4] rounded-lg overflow-hidden cursor-pointer group relative bg-card ${
                       !nearbyUser.isSelf && hasUnreadFrom(nearbyUser._id)
                         ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-background'
@@ -825,7 +993,6 @@ function HomePage() {
                     )}
                   </div>
                 ))}
-
                 {/* Upsell for free users when at profile limit */}
                 {!isUltra && nearbyUsers.length >= FREE_PROFILE_LIMIT && (
                   <div
@@ -849,20 +1016,14 @@ function HomePage() {
                     </Button>
                   </div>
                 )}
-              </div>
+              </div>)
             ) : (
               /* Detailed View */
-              <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              (<div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                 {nearbyUsers.map((nearbyUser) => (
                   <div
                     key={nearbyUser._id}
-                    onClick={() => {
-                      if (nearbyUser.isSelf) {
-                        navigate({ to: '/profile' })
-                      } else {
-                        navigate({ to: '/user/$userId', params: { userId: nearbyUser._id } })
-                      }
-                    }}
+                    onClick={() => handleViewProfile(nearbyUser._id, nearbyUser.isSelf)}
                     className={`bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:bg-card/80 transition-colors ${
                       !nearbyUser.isSelf && hasUnreadFrom(nearbyUser._id)
                         ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-background'
@@ -1017,7 +1178,6 @@ function HomePage() {
                     </div>
                   </div>
                 ))}
-
                 {/* Upsell for free users when at profile limit */}
                 {!isUltra && nearbyUsers.length >= FREE_PROFILE_LIMIT && (
                   <div
@@ -1038,7 +1198,7 @@ function HomePage() {
                     </Button>
                   </div>
                 )}
-              </div>
+              </div>)
             )}
 
             {/* Low Activity Content - shows when there are few users */}
@@ -1218,7 +1378,6 @@ function HomePage() {
           </>
         )}
       </main>
-
       {/* Profile Preview Modal */}
       {selectedUser && (
         <div
@@ -1429,6 +1588,48 @@ function HomePage() {
           </div>
         </div>
       )}
+
+      {/* Daily Limit Reached Modal for Free Users */}
+      <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="w-6 h-6 text-amber-500" />
+              Daily Limit Reached
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-muted-foreground">
+              You've viewed {FREE_DAILY_VIEW_LIMIT} profiles today while exploring. Free users
+              can view up to {FREE_DAILY_VIEW_LIMIT} profiles per day in explore mode. Switch to
+              nearby mode for unlimited local browsing!
+            </p>
+            <div className="bg-gradient-to-br from-amber-500/20 via-primary/10 to-transparent rounded-xl p-4 text-center">
+              <Sparkles className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+              <h3 className="font-bold text-lg text-foreground">
+                Upgrade to Ultra
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1 mb-4">
+                Get unlimited profile views, more matches, and premium features!
+              </p>
+              <Button
+                className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold"
+                onClick={() => {
+                  setShowLimitModal(false)
+                  if (checkoutUrl) {
+                    window.location.href = checkoutUrl
+                  }
+                }}
+              >
+                Get Ultra Now
+              </Button>
+            </div>
+            <p className="text-xs text-center text-muted-foreground">
+              Your daily limit resets at midnight
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

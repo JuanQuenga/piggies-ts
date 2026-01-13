@@ -11,6 +11,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   ImagePlus,
   Trash2,
@@ -18,6 +20,8 @@ import {
   Lock,
   X,
   Sparkles,
+  ArrowLeft,
+  Pencil,
 } from "lucide-react"
 import { toast } from "sonner"
 import { AlbumPhotoUpload } from "./AlbumPhotoUpload"
@@ -25,18 +29,41 @@ import { cn } from "@/lib/utils"
 
 interface PrivateAlbumManagerProps {
   userId: Id<"users">
+  albumId?: Id<"privateAlbums">
   isUltra: boolean
+  onBack?: () => void
 }
 
-export function PrivateAlbumManager({ userId, isUltra }: PrivateAlbumManagerProps) {
+export function PrivateAlbumManager({
+  userId,
+  albumId,
+  isUltra,
+  onBack,
+}: PrivateAlbumManagerProps) {
   const [showUpload, setShowUpload] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
   const [photoToDelete, setPhotoToDelete] = useState<Id<"privateAlbumPhotos"> | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showEditName, setShowEditName] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [isUpdatingName, setIsUpdatingName] = useState(false)
 
-  const albumPhotos = useQuery(api.albums.getMyAlbumPhotos, { userId })
-  const albumStatus = useQuery(api.albums.getAlbumStatus, { userId })
+  // If albumId is provided, get album photos; otherwise use legacy query
+  const albumPhotos = useQuery(
+    albumId ? api.albums.getAlbumPhotos : api.albums.getMyAlbumPhotos,
+    albumId ? { albumId, viewerUserId: userId } : { userId }
+  )
+  const albumStatus = useQuery(api.albums.getAlbumStatus, {
+    userId,
+    albumId,
+  })
+  const album = useQuery(
+    api.albums.getAlbum,
+    albumId ? { albumId, viewerUserId: userId } : "skip"
+  )
+
   const removePhoto = useMutation(api.albums.removePhotoFromAlbum)
+  const updateAlbum = useMutation(api.albums.updateAlbum)
 
   const handleDeletePhoto = async () => {
     if (!photoToDelete) return
@@ -53,25 +80,69 @@ export function PrivateAlbumManager({ userId, isUltra }: PrivateAlbumManagerProp
     }
   }
 
-  const isAtLimit = albumStatus?.isAtLimit ?? false
-  const photoCount = albumStatus?.count ?? 0
-  const photoLimit = albumStatus?.limit
+  const handleUpdateName = async () => {
+    if (!albumId || !newName.trim()) return
+
+    setIsUpdatingName(true)
+    try {
+      await updateAlbum({ userId, albumId, name: newName.trim() })
+      toast.success("Album name updated")
+      setShowEditName(false)
+      setNewName("")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update album name")
+    } finally {
+      setIsUpdatingName(false)
+    }
+  }
+
+  const isAtLimit = albumStatus?.isAtPhotoLimit ?? false
+  const photoCount = albumStatus?.photoCount ?? 0
+  const photoLimit = albumStatus?.photoLimit
+  const albumName = album?.name ?? "Private Album"
+  const isDefault = album?.isDefault ?? true
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Lock className="w-5 h-5" />
-            Private Album
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {photoLimit
-              ? `${photoCount} / ${photoLimit} photos`
-              : `${photoCount} photos`
-            }
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Lock className="w-5 h-5" />
+                {albumName}
+              </h2>
+              {albumId && !isDefault && isUltra && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="w-8 h-8"
+                  onClick={() => {
+                    setNewName(albumName)
+                    setShowEditName(true)
+                  }}
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {photoLimit
+                ? `${photoCount} / ${photoLimit} photos`
+                : `${photoCount} photos`}
+            </p>
+          </div>
         </div>
         {!isAtLimit && (
           <Button onClick={() => setShowUpload(true)}>
@@ -103,13 +174,14 @@ export function PrivateAlbumManager({ userId, isUltra }: PrivateAlbumManagerProp
       <Dialog open={showUpload} onOpenChange={setShowUpload}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Photo to Album</DialogTitle>
+            <DialogTitle>Add Photo to {albumName}</DialogTitle>
             <DialogDescription>
               Upload a photo to your private album. Only people you share with can see these photos.
             </DialogDescription>
           </DialogHeader>
           <AlbumPhotoUpload
             userId={userId}
+            albumId={albumId}
             isUltra={isUltra}
             onSuccess={() => setShowUpload(false)}
             onCancel={() => setShowUpload(false)}
@@ -117,10 +189,70 @@ export function PrivateAlbumManager({ userId, isUltra }: PrivateAlbumManagerProp
         </DialogContent>
       </Dialog>
 
+      {/* Edit album name dialog */}
+      <Dialog open={showEditName} onOpenChange={setShowEditName}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Album</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this album.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <Label htmlFor="edit-album-name">Album Name</Label>
+            <Input
+              id="edit-album-name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Album name"
+              maxLength={50}
+              disabled={isUpdatingName}
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              {newName.length}/50
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditName(false)}
+              disabled={isUpdatingName}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateName}
+              disabled={isUpdatingName || !newName.trim()}
+            >
+              {isUpdatingName ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Photo grid */}
       {albumPhotos === undefined ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : albumPhotos === null ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-4 border-2 border-dashed border-border rounded-xl">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+            <Lock className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <div className="text-center">
+            <p className="font-medium">Album not found</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              This album doesn't exist or you don't have access
+            </p>
+          </div>
         </div>
       ) : albumPhotos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-4 border-2 border-dashed border-border rounded-xl">

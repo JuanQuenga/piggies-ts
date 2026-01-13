@@ -23,9 +23,10 @@ import { Route as AuthenticatedReferralsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedPhotosRouteImport } from './routes/_authenticated/photos'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedNearbyRouteImport } from './routes/_authenticated/nearby'
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
 import { Route as AuthenticatedLookingNowRouteImport } from './routes/_authenticated/looking-now'
-import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
+import { Route as AuthenticatedInterestsRouteImport } from './routes/_authenticated/interests'
 import { Route as AuthenticatedAlbumRouteImport } from './routes/_authenticated/album'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
@@ -105,6 +106,11 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedNearbyRoute = AuthenticatedNearbyRouteImport.update({
+  id: '/nearby',
+  path: '/nearby',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedMessagesRoute = AuthenticatedMessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
@@ -115,9 +121,9 @@ const AuthenticatedLookingNowRoute = AuthenticatedLookingNowRouteImport.update({
   path: '/looking-now',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
-  id: '/home',
-  path: '/home',
+const AuthenticatedInterestsRoute = AuthenticatedInterestsRouteImport.update({
+  id: '/interests',
+  path: '/interests',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAlbumRoute = AuthenticatedAlbumRouteImport.update({
@@ -169,9 +175,10 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/album': typeof AuthenticatedAlbumRoute
-  '/home': typeof AuthenticatedHomeRoute
+  '/interests': typeof AuthenticatedInterestsRoute
   '/looking-now': typeof AuthenticatedLookingNowRoute
   '/messages': typeof AuthenticatedMessagesRoute
+  '/nearby': typeof AuthenticatedNearbyRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/photos': typeof AuthenticatedPhotosRoute
   '/profile': typeof AuthenticatedProfileRoute
@@ -194,9 +201,10 @@ export interface FileRoutesByTo {
   '/dev': typeof DevRoute
   '/login': typeof LoginRoute
   '/album': typeof AuthenticatedAlbumRoute
-  '/home': typeof AuthenticatedHomeRoute
+  '/interests': typeof AuthenticatedInterestsRoute
   '/looking-now': typeof AuthenticatedLookingNowRoute
   '/messages': typeof AuthenticatedMessagesRoute
+  '/nearby': typeof AuthenticatedNearbyRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/photos': typeof AuthenticatedPhotosRoute
   '/profile': typeof AuthenticatedProfileRoute
@@ -222,9 +230,10 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/album': typeof AuthenticatedAlbumRoute
-  '/_authenticated/home': typeof AuthenticatedHomeRoute
+  '/_authenticated/interests': typeof AuthenticatedInterestsRoute
   '/_authenticated/looking-now': typeof AuthenticatedLookingNowRoute
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
+  '/_authenticated/nearby': typeof AuthenticatedNearbyRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/photos': typeof AuthenticatedPhotosRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
@@ -250,9 +259,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin'
     | '/album'
-    | '/home'
+    | '/interests'
     | '/looking-now'
     | '/messages'
+    | '/nearby'
     | '/onboarding'
     | '/photos'
     | '/profile'
@@ -275,9 +285,10 @@ export interface FileRouteTypes {
     | '/dev'
     | '/login'
     | '/album'
-    | '/home'
+    | '/interests'
     | '/looking-now'
     | '/messages'
+    | '/nearby'
     | '/onboarding'
     | '/photos'
     | '/profile'
@@ -302,9 +313,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/admin'
     | '/_authenticated/album'
-    | '/_authenticated/home'
+    | '/_authenticated/interests'
     | '/_authenticated/looking-now'
     | '/_authenticated/messages'
+    | '/_authenticated/nearby'
     | '/_authenticated/onboarding'
     | '/_authenticated/photos'
     | '/_authenticated/profile'
@@ -434,6 +446,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/nearby': {
+      id: '/_authenticated/nearby'
+      path: '/nearby'
+      fullPath: '/nearby'
+      preLoaderRoute: typeof AuthenticatedNearbyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/messages': {
       id: '/_authenticated/messages'
       path: '/messages'
@@ -448,11 +467,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLookingNowRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/home': {
-      id: '/_authenticated/home'
-      path: '/home'
-      fullPath: '/home'
-      preLoaderRoute: typeof AuthenticatedHomeRouteImport
+    '/_authenticated/interests': {
+      id: '/_authenticated/interests'
+      path: '/interests'
+      fullPath: '/interests'
+      preLoaderRoute: typeof AuthenticatedInterestsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/album': {
@@ -532,9 +551,10 @@ const AuthenticatedAdminRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedAlbumRoute: typeof AuthenticatedAlbumRoute
-  AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
+  AuthenticatedInterestsRoute: typeof AuthenticatedInterestsRoute
   AuthenticatedLookingNowRoute: typeof AuthenticatedLookingNowRoute
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
+  AuthenticatedNearbyRoute: typeof AuthenticatedNearbyRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPhotosRoute: typeof AuthenticatedPhotosRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
@@ -548,9 +568,10 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedAlbumRoute: AuthenticatedAlbumRoute,
-  AuthenticatedHomeRoute: AuthenticatedHomeRoute,
+  AuthenticatedInterestsRoute: AuthenticatedInterestsRoute,
   AuthenticatedLookingNowRoute: AuthenticatedLookingNowRoute,
   AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
+  AuthenticatedNearbyRoute: AuthenticatedNearbyRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPhotosRoute: AuthenticatedPhotosRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
