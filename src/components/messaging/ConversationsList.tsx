@@ -6,11 +6,10 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Search, Edit, MapPin } from "lucide-react"
+import { Search } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "@/lib/date-utils"
-import { Link } from "@tanstack/react-router"
 
 interface ConversationsListProps {
   userId: Id<"users">
@@ -76,31 +75,6 @@ export function ConversationsList({
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
       <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Link to="/nearby">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-primary hover:bg-primary/10"
-              >
-                <MapPin className="w-5 h-5" />
-              </Button>
-            </Link>
-            <h1 className="text-xl font-bold">Messages</h1>
-          </div>
-          {onNewConversation && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onNewConversation}
-              className="text-primary hover:bg-primary/10"
-            >
-              <Edit className="w-5 h-5" />
-            </Button>
-          )}
-        </div>
-
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

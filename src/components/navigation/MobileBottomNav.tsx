@@ -1,8 +1,7 @@
-import { useLocation, useNavigate } from '@tanstack/react-router'
+import { Link, useLocation } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { Button } from '@/components/ui/button'
 import { MessageCircle, MapPin, ImageIcon, Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -14,7 +13,6 @@ interface NavItem {
 }
 
 export function MobileBottomNav() {
-  const navigate = useNavigate()
   const location = useLocation()
   const { user } = useCurrentUser()
 
@@ -61,15 +59,14 @@ export function MobileBottomNav() {
             const active = isActive(item.path)
 
             return (
-              <Button
+              <Link
                 key={item.label}
-                variant="ghost"
-                size="sm"
+                to={item.path}
+                activeOptions={{ exact: true }}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 h-14 px-4 relative",
-                  active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  "flex flex-col items-center justify-center gap-0.5 h-14 px-4 relative rounded-md touch-manipulation",
+                  active ? "text-primary" : "text-muted-foreground active:text-foreground"
                 )}
-                onClick={() => navigate({ to: item.path })}
               >
                 <div className="relative">
                   <Icon className="w-6 h-6" />
@@ -83,7 +80,7 @@ export function MobileBottomNav() {
                 {active && (
                   <div className="absolute bottom-1 w-1 h-1 bg-primary rounded-full" />
                 )}
-              </Button>
+              </Link>
             )
           })}
         </div>
