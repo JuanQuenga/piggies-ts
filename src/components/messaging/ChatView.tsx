@@ -30,7 +30,6 @@ import {
   Ban,
   Flag,
   StarOff,
-  ImageIcon,
   CheckCheck,
   Paperclip,
   ImagePlus,
@@ -41,7 +40,7 @@ import { formatTime, formatDateDivider } from "@/lib/date-utils"
 import { GifPicker } from "./GifPicker"
 import { MediaUpload } from "./MediaUpload"
 import { AlbumShareButton } from "../albums/AlbumShareButton"
-import { AlbumViewer } from "../albums/AlbumViewer"
+import { AlbumViewButton } from "../albums/AlbumViewButton"
 import { AlbumShareMessage } from "./AlbumShareMessage"
 import { useSubscription } from "@/hooks/useSubscription"
 import { toast } from "sonner"
@@ -61,7 +60,6 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
   const [showBlockDialog, setShowBlockDialog] = useState(false)
   const [reportReason, setReportReason] = useState("")
   const [reportDetails, setReportDetails] = useState("")
-  const [showAlbumViewer, setShowAlbumViewer] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const hasScrolledInitially = useRef(false)
@@ -332,17 +330,14 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
 
         {/* Actions */}
         <div className="flex items-center gap-1">
-          {/* View their album button (when they've shared) */}
-          {albumSharingStatus?.theyShared && otherUserId && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowAlbumViewer(true)}
-              className="relative"
-              title="View their album"
-            >
-              <ImageIcon className="w-5 h-5 text-primary" />
-            </Button>
+          {/* View their shared albums */}
+          {albumSharingStatus?.theirSharedAlbums && albumSharingStatus.theirSharedAlbums.length > 0 && otherUserId && (
+            <AlbumViewButton
+              viewerUserId={currentUserId}
+              ownerUserId={otherUserId}
+              ownerName={conversation?.otherParticipant.name ?? "User"}
+              sharedAlbums={albumSharingStatus.theirSharedAlbums}
+            />
           )}
 
           {/* Album share button */}
@@ -749,17 +744,6 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
         </DialogContent>
       </Dialog>
 
-      {/* Album Viewer */}
-      {otherUserId && (
-        <AlbumViewer
-          viewerUserId={currentUserId}
-          ownerUserId={otherUserId}
-          ownerName={conversation?.otherParticipant.name ?? "User"}
-          isOpen={showAlbumViewer}
-          onClose={() => setShowAlbumViewer(false)}
-          expiresAt={albumSharingStatus?.theirShareExpiresAt}
-        />
-      )}
     </div>
   )
 }
