@@ -56,6 +56,8 @@ export function ConversationsList({
         return `${prefix}GIF`
       case "location":
         return `${prefix}📍 Shared location`
+      case "album_share":
+        return `${prefix}🔓 Shared a private album`
       default:
         return `${prefix}${message.content}`
     }

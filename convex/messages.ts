@@ -108,7 +108,8 @@ export const sendMessage = mutation({
       v.literal("image"),
       v.literal("video"),
       v.literal("gif"),
-      v.literal("location")
+      v.literal("location"),
+      v.literal("album_share")
     ),
     storageId: v.optional(v.id("_storage")),
   },
@@ -160,7 +161,8 @@ export const sendMessageToConversation = mutation({
       v.literal("image"),
       v.literal("video"),
       v.literal("gif"),
-      v.literal("location")
+      v.literal("location"),
+      v.literal("album_share")
     ),
     storageId: v.optional(v.id("_storage")),
   },
@@ -358,7 +360,8 @@ export const getRecentConversations = query({
             v.literal("image"),
             v.literal("video"),
             v.literal("gif"),
-            v.literal("location")
+            v.literal("location"),
+            v.literal("album_share")
           ),
           senderId: v.id("users"),
           sentAt: v.number(),

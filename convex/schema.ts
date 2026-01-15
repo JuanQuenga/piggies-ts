@@ -99,7 +99,8 @@ export default defineSchema({
       v.literal("image"),
       v.literal("video"),
       v.literal("gif"),
-      v.literal("location")
+      v.literal("location"),
+      v.literal("album_share")
     ),
     storageId: v.optional(v.id("_storage")),
     sentAt: v.number(),

@@ -15,9 +15,9 @@ import {
   Ban,
   Flag,
   MoreVertical,
-  ImageIcon,
   Check,
 } from 'lucide-react'
+import { ProfileAlbumShareButton } from '@/components/albums/ProfileAlbumShareButton'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,9 +77,7 @@ function UserProfilePage() {
   const removeFavorite = useMutation(api.users.removeFavorite)
   const blockUser = useMutation(api.users.blockUser)
   const reportUser = useMutation(api.users.reportUser)
-  const getOrCreateConversation = useMutation(
-    api.messages.getOrCreateConversation
-  )
+  const startConversation = useMutation(api.messages.startConversation)
 
   // Record profile view
   const recordView = useMutation(api.users.recordProfileView)
@@ -154,32 +152,16 @@ function UserProfilePage() {
   const handleMessage = async () => {
     if (!currentUser?._id) return
     try {
-      const conversation = await getOrCreateConversation({
-        participantIds: [currentUser._id, userId as Id<'users'>],
+      const result = await startConversation({
+        currentUserId: currentUser._id,
+        otherUserId: userId as Id<'users'>,
       })
       navigate({
         to: '/messages',
-        search: { conversation: conversation._id },
+        search: { conversation: result.conversationId },
       })
     } catch {
       toast.error('Failed to start conversation')
-    }
-  }
-
-  const handleAlbumShare = async () => {
-    // Navigate to messages to manage album sharing
-    if (!currentUser?._id) return
-    try {
-      const conversation = await getOrCreateConversation({
-        participantIds: [currentUser._id, userId as Id<'users'>],
-      })
-      navigate({
-        to: '/messages',
-        search: { conversation: conversation._id },
-      })
-      toast.success('Manage album sharing in messages')
-    } catch {
-      toast.error('Failed to open conversation')
     }
   }
 
@@ -257,9 +239,13 @@ function UserProfilePage() {
             </Button>
 
             {/* Album Share */}
-            <Button variant="ghost" size="icon" onClick={handleAlbumShare}>
-              <ImageIcon className="w-5 h-5" />
-            </Button>
+            {currentUser?._id && (
+              <ProfileAlbumShareButton
+                currentUserId={currentUser._id}
+                targetUserId={userId as Id<'users'>}
+                isUltra={isUltra}
+              />
+            )}
 
             {/* More Options */}
             <DropdownMenu>

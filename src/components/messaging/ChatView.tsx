@@ -42,6 +42,7 @@ import { GifPicker } from "./GifPicker"
 import { MediaUpload } from "./MediaUpload"
 import { AlbumShareButton } from "../albums/AlbumShareButton"
 import { AlbumViewer } from "../albums/AlbumViewer"
+import { AlbumShareMessage } from "./AlbumShareMessage"
 import { useSubscription } from "@/hooks/useSubscription"
 import { toast } from "sonner"
 
@@ -522,15 +523,17 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
                             "max-w-[70%]",
                             message.format === "gif" || message.format === "image" || message.format === "video"
                               ? "rounded-xl overflow-hidden"
-                              : cn(
-                                  "px-4 py-2 rounded-2xl",
-                                  isOwn
-                                    ? "bg-primary text-primary-foreground rounded-br-md"
-                                    : "bg-card border border-border rounded-bl-md"
-                                )
+                              : message.format === "album_share"
+                                ? "px-4 py-3 rounded-2xl bg-card border border-border rounded-bl-md"
+                                : cn(
+                                    "px-4 py-2 rounded-2xl",
+                                    isOwn
+                                      ? "bg-primary text-primary-foreground rounded-br-md"
+                                      : "bg-card border border-border rounded-bl-md"
+                                  )
                           )}
                         >
-                          <MessageContent message={message} isOwn={isOwn} />
+                          <MessageContent message={message} isOwn={isOwn} currentUserId={currentUserId} />
 
                           {/* Time and Read Receipt */}
                           {showTime && (
@@ -539,9 +542,11 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
                                 "flex items-center gap-1 text-[10px] mt-1",
                                 message.format === "gif" || message.format === "image" || message.format === "video"
                                   ? "text-muted-foreground px-1"
-                                  : isOwn
-                                    ? "text-primary-foreground/70"
-                                    : "text-muted-foreground"
+                                  : message.format === "album_share"
+                                    ? "text-muted-foreground"
+                                    : isOwn
+                                      ? "text-primary-foreground/70"
+                                      : "text-muted-foreground"
                               )}
                             >
                               <span>{formatTime(message.sentAt)}</span>
@@ -760,16 +765,20 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
 }
 
 // Component to render different message types
-function MessageContent({ 
-  message, 
-  isOwn 
-}: { 
-  message: { 
+function MessageContent({
+  message,
+  isOwn,
+  currentUserId,
+}: {
+  message: {
     content: string
     format: string
     storageId?: Id<"_storage">
+    senderId: Id<"users">
+    sender: { name: string }
   }
-  isOwn: boolean 
+  isOwn: boolean
+  currentUserId: Id<"users">
 }) {
   // For media messages with storage ID, we'd fetch the URL
   // For now, we'll handle the formats we have
@@ -827,7 +836,18 @@ function MessageContent({
           <span className="text-muted-foreground">📍 Location shared</span>
         </div>
       )
-    
+
+    case "album_share":
+      return (
+        <AlbumShareMessage
+          content={message.content}
+          isOwn={isOwn}
+          senderId={message.senderId}
+          currentUserId={currentUserId}
+          senderName={message.sender.name}
+        />
+      )
+
     default:
       return (
         <p className="text-sm whitespace-pre-wrap break-words">
