@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, Link } from '@tanstack/react-router'
 import { getAuth, getSignInUrl } from '@workos/authkit-tanstack-react-start'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -80,9 +80,7 @@ function LoginPage() {
         {/* Footer */}
         <p className="text-muted-foreground text-sm">
           By signing in, you agree to our{' '}
-          <a href="#" className="text-primary hover:underline">Terms</a>
-          {' '}and{' '}
-          <a href="#" className="text-primary hover:underline">Privacy Policy</a>
+          <Link to="/legal" className="text-primary hover:underline">Terms & Privacy Policy</Link>
         </p>
       </div>
     </div>

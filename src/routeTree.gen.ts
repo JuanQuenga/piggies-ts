@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LegalRouteImport } from './routes/legal'
 import { Route as DevRouteImport } from './routes/dev'
 import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
@@ -39,6 +40,11 @@ import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authent
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalRoute = LegalRouteImport.update({
+  id: '/legal',
+  path: '/legal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevRoute = DevRouteImport.update({
@@ -172,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
   '/dev': typeof DevRoute
+  '/legal': typeof LegalRoute
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/album': typeof AuthenticatedAlbumRoute
@@ -199,6 +206,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
   '/dev': typeof DevRoute
+  '/legal': typeof LegalRoute
   '/login': typeof LoginRoute
   '/album': typeof AuthenticatedAlbumRoute
   '/interests': typeof AuthenticatedInterestsRoute
@@ -227,6 +235,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/callback': typeof CallbackRoute
   '/dev': typeof DevRoute
+  '/legal': typeof LegalRoute
   '/login': typeof LoginRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/album': typeof AuthenticatedAlbumRoute
@@ -256,6 +265,7 @@ export interface FileRouteTypes {
     | '/'
     | '/callback'
     | '/dev'
+    | '/legal'
     | '/login'
     | '/admin'
     | '/album'
@@ -283,6 +293,7 @@ export interface FileRouteTypes {
     | '/'
     | '/callback'
     | '/dev'
+    | '/legal'
     | '/login'
     | '/album'
     | '/interests'
@@ -310,6 +321,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/callback'
     | '/dev'
+    | '/legal'
     | '/login'
     | '/_authenticated/admin'
     | '/_authenticated/album'
@@ -339,6 +351,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   CallbackRoute: typeof CallbackRoute
   DevRoute: typeof DevRoute
+  LegalRoute: typeof LegalRoute
   LoginRoute: typeof LoginRoute
   ApiCheckoutRoute: typeof ApiCheckoutRoute
   ApiPortalRoute: typeof ApiPortalRoute
@@ -353,6 +366,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal': {
+      id: '/legal'
+      path: '/legal'
+      fullPath: '/legal'
+      preLoaderRoute: typeof LegalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev': {
@@ -591,6 +611,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   CallbackRoute: CallbackRoute,
   DevRoute: DevRoute,
+  LegalRoute: LegalRoute,
   LoginRoute: LoginRoute,
   ApiCheckoutRoute: ApiCheckoutRoute,
   ApiPortalRoute: ApiPortalRoute,
