@@ -3,6 +3,7 @@ import { getAuth, getSignInUrl, signOut } from '@workos/authkit-tanstack-react-s
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useLocationTracking } from '@/hooks/useLocationTracking'
 import { useEffect, useState } from 'react'
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav'
 import { AppHeader } from '@/components/navigation/AppHeader'
@@ -32,6 +33,9 @@ function AuthenticatedLayout() {
   const { user: convexUser, isLoading } = useCurrentUser()
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Automatically track and update user location
+  useLocationTracking()
 
   // Fetch user profile to check onboarding status
   const profile = useQuery(

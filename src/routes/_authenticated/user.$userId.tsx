@@ -290,74 +290,86 @@ function UserProfilePage() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-2xl mx-auto p-4 pb-24">
-        {/* Photo Section */}
-        <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-card mb-4">
-          {currentPhoto ? (
-            <img
-              src={currentPhoto}
-              alt={displayName}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 flex items-center justify-center">
-              <img
-                src="/pig-snout.svg"
-                alt=""
-                className="w-32 h-32 opacity-60"
-              />
+      {/* Main Content - Desktop: side by side, Mobile: stacked */}
+      <div className="max-w-6xl mx-auto p-4 pb-24">
+        <div className="flex flex-col lg:flex-row lg:gap-8">
+          {/* Photo Section - Left side on desktop */}
+          <div className="lg:w-1/2 lg:sticky lg:top-28 lg:self-start">
+            {/* Main Photo */}
+            <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-card">
+              {currentPhoto ? (
+                <img
+                  src={currentPhoto}
+                  alt={displayName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 flex items-center justify-center">
+                  <img
+                    src="/pig-snout.svg"
+                    alt=""
+                    className="w-32 h-32 opacity-60"
+                  />
+                </div>
+              )}
+
+              {/* Photo navigation arrows (for mobile/touch) */}
+              {hasMultiplePhotos && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full lg:hidden"
+                    onClick={handlePrevPhoto}
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full lg:hidden"
+                    onClick={handleNextPhoto}
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </Button>
+                </>
+              )}
+
+              {/* Online indicator */}
+              {user.isOnline && (
+                <div className="absolute top-4 right-4 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  <span className="text-white text-sm font-medium">Online</span>
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Photo navigation */}
-          {hasMultiplePhotos && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full"
-                onClick={handlePrevPhoto}
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full"
-                onClick={handleNextPhoto}
-              >
-                <ChevronRight className="w-6 h-6" />
-              </Button>
-
-              {/* Photo indicators */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-                {photos.map((_, index) => (
+            {/* Photo Thumbnails */}
+            {photos.length > 0 && (
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted">
+                {photos.map((photo, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentPhotoIndex(index)}
-                    className={`w-2 h-2 rounded-full transition-all ${
+                    className={`relative flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden transition-all ${
                       index === currentPhotoIndex
-                        ? 'bg-white w-4'
-                        : 'bg-white/50'
+                        ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                        : 'opacity-70 hover:opacity-100'
                     }`}
-                  />
+                  >
+                    <img
+                      src={photo}
+                      alt={`Photo ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
                 ))}
               </div>
-            </>
-          )}
+            )}
+          </div>
 
-          {/* Online indicator */}
-          {user.isOnline && (
-            <div className="absolute top-4 right-4 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full" />
-              <span className="text-white text-sm font-medium">Online</span>
-            </div>
-          )}
-        </div>
-
-        {/* Profile Info */}
-        <div className="space-y-4">
+          {/* Profile Info - Right side on desktop */}
+          <div className="lg:w-1/2 mt-4 lg:mt-0 space-y-4">
           {/* Name and Age */}
           <div>
             <h1 className="text-2xl font-bold">
@@ -415,12 +427,13 @@ function UserProfilePage() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
 
       {/* Fixed Bottom Actions */}
       <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border p-4">
-        <div className="max-w-2xl mx-auto flex gap-3">
+        <div className="max-w-6xl mx-auto flex gap-3 lg:w-1/2 lg:ml-auto lg:pr-4">
           <Button
             variant="outline"
             size="lg"

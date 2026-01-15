@@ -12,24 +12,19 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Plus,
   Lock,
   Image,
-  MoreVertical,
   Pencil,
   Trash2,
   Loader2,
   Sparkles,
   FolderOpen,
+  Users,
 } from "lucide-react"
 import { toast } from "sonner"
 import { AlbumCreateDialog } from "./AlbumCreateDialog"
+import { AlbumAccessDialog } from "./AlbumAccessDialog"
 import { cn } from "@/lib/utils"
 
 interface AlbumListProps {
@@ -45,6 +40,10 @@ export function AlbumList({ userId, isUltra, onSelectAlbum }: AlbumListProps) {
     name: string
   } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [accessDialogAlbum, setAccessDialogAlbum] = useState<{
+    id: Id<"privateAlbums">
+    name: string
+  } | null>(null)
 
   const albums = useQuery(api.albums.listMyAlbums, { userId })
   const albumStatus = useQuery(api.albums.getAlbumStatus, { userId })
@@ -174,41 +173,19 @@ export function AlbumList({ userId, isUltra, onSelectAlbum }: AlbumListProps) {
                   </div>
                 )}
 
-                {/* Menu for non-default albums */}
+                {/* Delete button for non-default albums */}
                 {!album.isDefault && isUltra && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-2 right-2 w-8 h-8 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onSelectAlbum(album._id)
-                        }}
-                      >
-                        <Pencil className="w-4 h-4 mr-2" />
-                        Edit Album
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setAlbumToDelete({ id: album._id, name: album.name })
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete Album
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 w-8 h-8 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setAlbumToDelete({ id: album._id, name: album.name })
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 )}
               </div>
 
@@ -218,6 +195,39 @@ export function AlbumList({ userId, isUltra, onSelectAlbum }: AlbumListProps) {
                 <p className="text-sm text-muted-foreground">
                   {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
                 </p>
+
+                {/* Action buttons */}
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-8 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSelectAlbum(album._id)
+                    }}
+                  >
+                    <Pencil className="w-3 h-3 mr-1" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-8 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setAccessDialogAlbum({ id: album._id, name: album.name })
+                    }}
+                  >
+                    <Users className="w-3 h-3 mr-1" />
+                    Access
+                    {album.shareCount > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-medium">
+                        {album.shareCount}
+                      </span>
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
@@ -274,6 +284,17 @@ export function AlbumList({ userId, isUltra, onSelectAlbum }: AlbumListProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Album Access Dialog */}
+      {accessDialogAlbum && (
+        <AlbumAccessDialog
+          userId={userId}
+          albumId={accessDialogAlbum.id}
+          albumName={accessDialogAlbum.name}
+          isOpen={true}
+          onClose={() => setAccessDialogAlbum(null)}
+        />
+      )}
     </div>
   )
 }

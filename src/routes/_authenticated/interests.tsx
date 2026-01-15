@@ -15,7 +15,6 @@ import {
   MessageCircle,
   Check,
   Eye,
-  Heart,
 } from 'lucide-react'
 import { formatDistanceToNow } from '@/lib/date-utils'
 
@@ -111,20 +110,14 @@ function InterestsPage() {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
       </div>
 
-      <main className="relative z-10 max-w-2xl mx-auto px-4 py-6 pb-32">
-        {/* Page Title */}
-        <h1 className="font-bold text-2xl flex items-center gap-2 mb-6">
-          <Heart className="w-6 h-6 text-primary" />
-          Interests
-        </h1>
-
-        {/* Stats Cards */}
+      <main className="relative z-10 max-w-2xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 lg:px-8 py-6 pb-32">
+        {/* Stats Cards - clickable tabs on mobile, static stats on desktop */}
         <section className="mb-6 grid grid-cols-2 gap-4">
           <div
-            className={`p-4 bg-card rounded-2xl border cursor-pointer transition-all ${
+            className={`p-4 bg-card rounded-2xl border transition-all lg:cursor-default cursor-pointer ${
               activeTab === 'waves'
-                ? 'border-primary ring-2 ring-primary/20'
-                : 'border-border hover:border-primary/50'
+                ? 'border-primary ring-2 ring-primary/20 lg:border-border lg:ring-0'
+                : 'border-border hover:border-primary/50 lg:hover:border-border'
             }`}
             onClick={() => setActiveTab('waves')}
           >
@@ -148,10 +141,10 @@ function InterestsPage() {
           </div>
 
           <div
-            className={`p-4 bg-card rounded-2xl border cursor-pointer transition-all ${
+            className={`p-4 bg-card rounded-2xl border transition-all lg:cursor-default cursor-pointer ${
               activeTab === 'viewers'
-                ? 'border-primary ring-2 ring-primary/20'
-                : 'border-border hover:border-primary/50'
+                ? 'border-primary ring-2 ring-primary/20 lg:border-border lg:ring-0'
+                : 'border-border hover:border-primary/50 lg:hover:border-border'
             }`}
             onClick={() => setActiveTab('viewers')}
           >
@@ -191,34 +184,66 @@ function InterestsPage() {
           </section>
         )}
 
-        {/* Tab Content */}
-        {activeTab === 'waves' && (
-          <WavesTab
-            waves={waves}
-            totalCount={totalWaves}
-            hasMore={wavesData?.hasMore ?? false}
-            isUltra={isUltra ?? false}
-            wavingUsers={wavingUsers}
-            onWave={handleWaveWithAnimation}
-            onMessage={handleMessage}
-            onViewProfile={handleViewProfile}
-            onUpgrade={handleUpgrade}
-          />
-        )}
+        {/* Mobile: Tab Content */}
+        <div className="lg:hidden">
+          {activeTab === 'waves' && (
+            <WavesTab
+              waves={waves}
+              totalCount={totalWaves}
+              hasMore={wavesData?.hasMore ?? false}
+              isUltra={isUltra ?? false}
+              wavingUsers={wavingUsers}
+              onWave={handleWaveWithAnimation}
+              onMessage={handleMessage}
+              onViewProfile={handleViewProfile}
+              onUpgrade={handleUpgrade}
+            />
+          )}
 
-        {activeTab === 'viewers' && (
-          <ViewersTab
-            viewers={viewers}
-            totalCount={totalViewers}
-            hasMore={viewersData?.hasMore ?? false}
-            isUltra={isUltra ?? false}
-            wavingUsers={wavingUsers}
-            onWave={handleWaveWithAnimation}
-            onMessage={handleMessage}
-            onViewProfile={handleViewProfile}
-            onUpgrade={handleUpgrade}
-          />
-        )}
+          {activeTab === 'viewers' && (
+            <ViewersTab
+              viewers={viewers}
+              totalCount={totalViewers}
+              hasMore={viewersData?.hasMore ?? false}
+              isUltra={isUltra ?? false}
+              wavingUsers={wavingUsers}
+              onWave={handleWaveWithAnimation}
+              onMessage={handleMessage}
+              onViewProfile={handleViewProfile}
+              onUpgrade={handleUpgrade}
+            />
+          )}
+        </div>
+
+        {/* Desktop: Side by side layout */}
+        <div className="hidden lg:grid lg:grid-cols-2 lg:gap-6">
+          <div className="bg-card/50 rounded-2xl border border-border p-5">
+            <WavesTab
+              waves={waves}
+              totalCount={totalWaves}
+              hasMore={wavesData?.hasMore ?? false}
+              isUltra={isUltra ?? false}
+              wavingUsers={wavingUsers}
+              onWave={handleWaveWithAnimation}
+              onMessage={handleMessage}
+              onViewProfile={handleViewProfile}
+              onUpgrade={handleUpgrade}
+            />
+          </div>
+          <div className="bg-card/50 rounded-2xl border border-border p-5">
+            <ViewersTab
+              viewers={viewers}
+              totalCount={totalViewers}
+              hasMore={viewersData?.hasMore ?? false}
+              isUltra={isUltra ?? false}
+              wavingUsers={wavingUsers}
+              onWave={handleWaveWithAnimation}
+              onMessage={handleMessage}
+              onViewProfile={handleViewProfile}
+              onUpgrade={handleUpgrade}
+            />
+          </div>
+        </div>
       </main>
     </div>
   )
@@ -540,15 +565,16 @@ function EmptyState({
   const navigate = useNavigate()
 
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+    <div className="flex flex-col items-center justify-center py-12 lg:py-8 text-center">
+      <div className="w-16 h-16 lg:w-14 lg:h-14 bg-muted rounded-full flex items-center justify-center mb-3">
         {icon}
       </div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
-      <p className="text-muted-foreground max-w-xs">{description}</p>
+      <h3 className="text-base font-semibold mb-1">{title}</h3>
+      <p className="text-sm text-muted-foreground max-w-xs">{description}</p>
       <Button
         variant="outline"
-        className="mt-4"
+        size="sm"
+        className="mt-3"
         onClick={() => navigate({ to: '/profile' })}
       >
         <User className="w-4 h-4 mr-2" />

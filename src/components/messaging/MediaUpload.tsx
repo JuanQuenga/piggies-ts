@@ -18,6 +18,7 @@ interface MediaUploadProps {
   isUltra: boolean
   onSuccess?: () => void
   onError?: (error: string) => void
+  triggerId?: string
 }
 
 type MediaType = "image" | "video"
@@ -36,6 +37,7 @@ export function MediaUpload({
   isUltra,
   onSuccess,
   onError,
+  triggerId,
 }: MediaUploadProps) {
   const [showPicker, setShowPicker] = useState(false)
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia | null>(null)
@@ -190,6 +192,7 @@ export function MediaUpload({
         onClick={handleOpenMediaPicker}
         className="shrink-0 text-muted-foreground hover:text-primary"
         disabled={isUploading}
+        id={triggerId}
       >
         {isUploading ? (
           <Loader2 className="w-5 h-5 animate-spin" />
@@ -413,5 +416,6 @@ export function MediaUpload({
     </>
   )
 }
+
 
 

@@ -1,22 +1,18 @@
 import { useState, useEffect } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useSubscription } from '@/hooks/useSubscription'
-import { Button } from '@/components/ui/button'
 import {
-  ArrowLeft,
   Loader2,
   Lock,
   Unlock,
-  Users,
   FolderOpen,
 } from 'lucide-react'
 import { PrivateAlbumManager } from '@/components/albums/PrivateAlbumManager'
 import { AlbumList } from '@/components/albums/AlbumList'
 import { UnlockedAlbumsTab } from '@/components/photos/UnlockedAlbumsTab'
-import { AlbumAccessTab } from '@/components/photos/AlbumAccessTab'
 import { cn } from '@/lib/utils'
 import { Id } from '../../../convex/_generated/dataModel'
 
@@ -24,10 +20,9 @@ export const Route = createFileRoute('/_authenticated/photos')({
   component: PhotosPage,
 })
 
-type PhotosTab = 'albums' | 'private' | 'unlocked' | 'access'
+type PhotosTab = 'albums' | 'private' | 'unlocked'
 
 function PhotosPage() {
-  const navigate = useNavigate()
   const { user, isLoading: isUserLoading } = useCurrentUser()
   const { isUltra, isLoading: isSubLoading } = useSubscription()
   const [activeTab, setActiveTab] = useState<PhotosTab | null>(null)
@@ -61,12 +56,10 @@ function PhotosPage() {
     ? [
         { id: 'albums', label: 'My Albums', icon: FolderOpen },
         { id: 'unlocked', label: 'Unlocked', icon: Unlock },
-        { id: 'access', label: 'Access', icon: Users },
       ]
     : [
         { id: 'private', label: 'My Album', icon: Lock },
         { id: 'unlocked', label: 'Unlocked', icon: Unlock },
-        { id: 'access', label: 'Access', icon: Users },
       ]
 
   // Wait for all necessary data to load
@@ -131,8 +124,6 @@ function PhotosPage() {
         )
       case 'unlocked':
         return <UnlockedAlbumsTab userId={user._id} />
-      case 'access':
-        return <AlbumAccessTab userId={user._id} />
       default:
         return null
     }
@@ -148,14 +139,6 @@ function PhotosPage() {
 
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border">
-        <div className="flex items-center justify-between h-14 px-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/nearby' })}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="font-bold text-lg">Albums</h1>
-          <div className="w-10" />
-        </div>
-
         {/* Tab navigation - hide when viewing a specific album */}
         {!(isUltra && selectedAlbumId) && (
           <div className="flex border-b border-border overflow-x-auto">

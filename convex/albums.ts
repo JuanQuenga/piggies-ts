@@ -212,7 +212,8 @@ export const listMyAlbums = query({
       return b.createdAt - a.createdAt;
     });
 
-    // Get photo count and cover for each album
+    // Get photo count, cover, and share count for each album
+    const now = Date.now();
     const albumsWithDetails = await Promise.all(
       albums.map(async (album) => {
         const photos = await ctx.db
@@ -232,10 +233,20 @@ export const listMyAlbums = query({
           coverUrl = await ctx.storage.getUrl(photos[0].storageId);
         }
 
+        // Get active share count for this album
+        const shares = await ctx.db
+          .query("albumAccessGrants")
+          .withIndex("by_album", (q) => q.eq("albumId", album._id))
+          .collect();
+        const activeShares = shares.filter(
+          (s) => !s.isRevoked && (!s.expiresAt || s.expiresAt > now)
+        );
+
         return {
           ...album,
           photoCount: photos.length,
           coverUrl,
+          shareCount: activeShares.length,
         };
       })
     );
@@ -935,6 +946,52 @@ export const viewUserAlbum = query({
       albumName: DEFAULT_ALBUM_NAME,
       photos: photosWithUrls.filter((p) => p.url !== null),
     };
+  },
+});
+
+// Get shares for a specific album
+export const getAlbumShares = query({
+  args: {
+    userId: v.id("users"),
+    albumId: v.id("privateAlbums"),
+  },
+  handler: async (ctx, args) => {
+    // Verify ownership
+    const album = await ctx.db.get(args.albumId);
+    if (!album || album.userId !== args.userId) {
+      return [];
+    }
+
+    const grants = await ctx.db
+      .query("albumAccessGrants")
+      .withIndex("by_album", (q) => q.eq("albumId", args.albumId))
+      .collect();
+
+    const now = Date.now();
+    const activeGrants = grants.filter(
+      (g) => !g.isRevoked && (!g.expiresAt || g.expiresAt > now)
+    );
+
+    const grantsWithDetails = await Promise.all(
+      activeGrants.map(async (grant) => {
+        const user = await ctx.db.get(grant.grantedUserId);
+        const profile = await ctx.db
+          .query("profiles")
+          .withIndex("by_userId", (q) => q.eq("userId", grant.grantedUserId))
+          .unique();
+
+        return {
+          ...grant,
+          grantedUser: {
+            _id: grant.grantedUserId,
+            name: profile?.displayName ?? user?.name ?? "Unknown",
+            imageUrl: user?.imageUrl,
+          },
+        };
+      })
+    );
+
+    return grantsWithDetails;
   },
 });
 

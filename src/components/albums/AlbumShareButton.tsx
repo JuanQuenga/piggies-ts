@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuLabel,
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu"
 import {
   Dialog,
@@ -160,40 +161,42 @@ export function AlbumShareButton({
           {/* Shared Albums Section */}
           {hasSharedAlbums && (
             <>
-              <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Check className="w-3 h-3" />
-                Shared ({sharedAlbumCount})
-              </DropdownMenuLabel>
-              {sharingStatus?.mySharedAlbums?.map((share) => (
-                <div
-                  key={share.grantId}
-                  className="px-2 py-1.5 text-sm flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Lock className="w-3 h-3 text-green-500 shrink-0" />
-                    <span className="truncate">{share.albumName}</span>
-                    {share.expiresAt && (
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        ({formatExpiry(share.expiresAt)})
-                      </span>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="w-6 h-6 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => {
-                      setAlbumToRevoke({
-                        id: share.albumId,
-                        name: share.albumName,
-                      })
-                      setShowRevokeConfirm(true)
-                    }}
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Check className="w-3 h-3" />
+                  Shared ({sharedAlbumCount})
+                </DropdownMenuLabel>
+                {sharingStatus?.mySharedAlbums?.map((share) => (
+                  <div
+                    key={share.grantId}
+                    className="px-2 py-1.5 text-sm flex items-center justify-between"
                   >
-                    <X className="w-3 h-3" />
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Lock className="w-3 h-3 text-green-500 shrink-0" />
+                      <span className="truncate">{share.albumName}</span>
+                      {share.expiresAt && (
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          ({formatExpiry(share.expiresAt)})
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-6 h-6 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        setAlbumToRevoke({
+                          id: share.albumId,
+                          name: share.albumName,
+                        })
+                        setShowRevokeConfirm(true)
+                      }}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+              </DropdownMenuGroup>
               <DropdownMenuSeparator />
             </>
           )}

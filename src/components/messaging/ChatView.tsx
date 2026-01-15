@@ -32,10 +32,12 @@ import {
   StarOff,
   ImageIcon,
   CheckCheck,
+  Paperclip,
+  ImagePlus,
 } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useLayoutEffect } from "react"
 import { cn } from "@/lib/utils"
-import { formatTime, formatDateDivider, formatDistanceToNow } from "@/lib/date-utils"
+import { formatTime, formatDateDivider } from "@/lib/date-utils"
 import { GifPicker } from "./GifPicker"
 import { MediaUpload } from "./MediaUpload"
 import { AlbumShareButton } from "../albums/AlbumShareButton"
@@ -53,13 +55,15 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
   const [messageInput, setMessageInput] = useState("")
   const [isSending, setIsSending] = useState(false)
   const [showGifPicker, setShowGifPicker] = useState(false)
+  const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [showReportDialog, setShowReportDialog] = useState(false)
   const [showBlockDialog, setShowBlockDialog] = useState(false)
   const [reportReason, setReportReason] = useState("")
   const [reportDetails, setReportDetails] = useState("")
   const [showAlbumViewer, setShowAlbumViewer] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const hasScrolledInitially = useRef(false)
 
   const { isUltra } = useSubscription()
 
@@ -104,21 +108,58 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
     }
   }, [conversationId, currentUserId, markRead])
 
-  // Scroll to bottom on new messages
+  // Helper to scroll to bottom
+  const scrollToBottom = (smooth = false) => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    if (smooth) {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" })
+    } else {
+      container.scrollTop = container.scrollHeight
+    }
+  }
+
+  // Reset scroll state when conversation changes
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    hasScrolledInitially.current = false
+  }, [conversationId])
+
+  // Initial scroll - use useLayoutEffect to scroll before browser paints
+  useLayoutEffect(() => {
+    if (messages && messages.length > 0 && !hasScrolledInitially.current) {
+      scrollToBottom(false)
+      hasScrolledInitially.current = true
+    }
   }, [messages])
 
-  // Close GIF picker when clicking outside
+  // Smooth scroll for new messages after initial load
+  const lastMessageId = messages?.[0]?._id
+  const prevLastMessageId = useRef<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (!hasScrolledInitially.current) return
+
+    // Only smooth scroll when a new message is added
+    if (lastMessageId && prevLastMessageId.current && lastMessageId !== prevLastMessageId.current) {
+      scrollToBottom(true)
+    }
+    prevLastMessageId.current = lastMessageId
+  }, [lastMessageId])
+
+  // Close GIF picker and attach menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showGifPicker && !(e.target as Element).closest('.gif-picker-container')) {
         setShowGifPicker(false)
       }
+      if (showAttachMenu && !(e.target as Element).closest('.attach-menu-container')) {
+        setShowAttachMenu(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showGifPicker])
+  }, [showGifPicker, showAttachMenu])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -244,8 +285,8 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
 
   return (
     <div className="flex flex-col h-full bg-background relative">
-      {/* Header */}
-      <div className="flex items-center gap-3 p-3 border-b border-border bg-card/50 backdrop-blur-sm">
+      {/* Header - fixed on mobile to stay visible with the app nav */}
+      <div className="fixed top-14 left-0 right-0 z-10 flex items-center gap-3 p-3 border-b border-border bg-card/95 backdrop-blur-sm lg:sticky lg:top-0">
         {/* Back button - visible on mobile */}
         {onBack && (
           <Button
@@ -361,8 +402,13 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
         </div>
       </div>
 
+      {/* Spacer for fixed header on mobile */}
+      <div className="h-[60px] shrink-0 lg:hidden" />
+
+      {/* Spacer for fixed input on mobile (at bottom, will be added after ScrollArea) */}
+
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-4 pb-20 lg:pb-4" viewportRef={scrollContainerRef}>
         {/* Load more button */}
         {status === "CanLoadMore" && (
           <div className="flex justify-center mb-4">
@@ -517,13 +563,12 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
           </div>
         )}
 
-        <div ref={messagesEndRef} />
       </ScrollArea>
 
-      {/* Message Input */}
+      {/* Message Input - fixed at bottom on mobile */}
       <form
         onSubmit={handleSendMessage}
-        className="flex items-center gap-2 p-4 border-t border-border bg-card/50 relative"
+        className="fixed bottom-16 left-0 right-0 z-10 flex items-center gap-2 p-3 border-t border-border bg-card/95 backdrop-blur-sm lg:sticky lg:bottom-0 lg:p-4"
       >
         {/* GIF Picker */}
         {showGifPicker && (
@@ -535,21 +580,78 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
           </div>
         )}
 
-        {/* Media Upload */}
-        <MediaUpload
-          conversationId={conversationId}
-          senderId={currentUserId}
-          isUltra={isUltra}
-        />
+        {/* Mobile: Combined paperclip button with attachment menu */}
+        <div className="relative lg:hidden attach-menu-container">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowAttachMenu(!showAttachMenu)}
+            className={cn(
+              "shrink-0 text-muted-foreground hover:text-primary",
+              showAttachMenu && "text-primary bg-primary/10"
+            )}
+          >
+            <Paperclip className="w-5 h-5" />
+          </Button>
 
-        {/* GIF Button */}
+          {/* Attachment menu popup */}
+          {showAttachMenu && (
+            <div className="absolute bottom-full left-0 mb-2 bg-card border border-border rounded-xl shadow-xl overflow-hidden min-w-[140px]">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAttachMenu(false)
+                  // Trigger MediaUpload's picker
+                  document.getElementById('mobile-media-upload')?.click()
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors"
+              >
+                <ImagePlus className="w-5 h-5 text-muted-foreground" />
+                <span>Photo/Video</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAttachMenu(false)
+                  setShowGifPicker(true)
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors border-t border-border"
+              >
+                <Smile className="w-5 h-5 text-muted-foreground" />
+                <span>GIF</span>
+              </button>
+            </div>
+          )}
+
+          {/* Hidden MediaUpload trigger for mobile */}
+          <div className="hidden">
+            <MediaUpload
+              conversationId={conversationId}
+              senderId={currentUserId}
+              isUltra={isUltra}
+              triggerId="mobile-media-upload"
+            />
+          </div>
+        </div>
+
+        {/* Desktop: Separate Media Upload button */}
+        <div className="hidden lg:block">
+          <MediaUpload
+            conversationId={conversationId}
+            senderId={currentUserId}
+            isUltra={isUltra}
+          />
+        </div>
+
+        {/* Desktop: GIF Button */}
         <Button
           type="button"
           variant="ghost"
           size="icon"
           onClick={() => setShowGifPicker(!showGifPicker)}
           className={cn(
-            "shrink-0 text-muted-foreground hover:text-primary",
+            "shrink-0 text-muted-foreground hover:text-primary hidden lg:flex",
             showGifPicker && "text-primary bg-primary/10"
           )}
         >

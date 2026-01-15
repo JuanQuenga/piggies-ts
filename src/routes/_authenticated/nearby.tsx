@@ -11,7 +11,6 @@ import { toast } from 'sonner'
 import {
   LayoutList,
   Grid3X3,
-  MapPin,
   MessageCircle,
   Filter,
   User,
@@ -31,10 +30,7 @@ import {
   Zap,
   Shield,
   Star,
-  Navigation,
-  Loader2,
   Check,
-  Telescope,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -45,7 +41,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 
 export const Route = createFileRoute('/_authenticated/nearby')({
   component: NearbyPage,
@@ -88,6 +83,7 @@ function NearbyPage() {
     return 'grid'
   })
   const [onlineOnly, setOnlineOnly] = useState(false)
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
 
   // Persist view mode preference
   useEffect(() => {
@@ -129,206 +125,47 @@ function NearbyPage() {
     }, 2500)
   }
 
-  // Location state (persisted to localStorage)
-  const [locationDialogOpen, setLocationDialogOpen] = useState(false)
-  const [locationType, setLocationType] = useState<'nearby' | 'custom'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('piggies-location-type')
-      if (saved === 'nearby' || saved === 'custom') return saved
-    }
-    return 'nearby'
-  })
-  const [customLocation, setCustomLocation] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('piggies-custom-location') || ''
-    }
-    return ''
-  })
-  const [customLocationInput, setCustomLocationInput] = useState('')
-  const [isGettingLocation, setIsGettingLocation] = useState(false)
-  const [nearbyLocationName, setNearbyLocationName] = useState<string | null>(
-    () => {
-      if (typeof window !== 'undefined') {
-        return localStorage.getItem('piggies-nearby-location')
-      }
-      return null
-    },
-  )
-  // Store actual coordinates for nearby mode
-  const [nearbyCoords, setNearbyCoords] = useState<{
-    latitude: number
-    longitude: number
-  } | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('piggies-nearby-coords')
-      if (saved) {
-        try {
-          return JSON.parse(saved)
-        } catch {
-          return null
-        }
+  // Location state - reads from localStorage, managed by AppHeader
+  const readLocationFromStorage = () => {
+    if (typeof window === 'undefined') {
+      return {
+        locationType: 'nearby' as const,
+        nearbyCoords: null as { latitude: number; longitude: number } | null,
+        customCoords: null as { latitude: number; longitude: number } | null,
+        customLocation: '',
       }
     }
-    return null
-  })
-  // Store coordinates for custom location too
-  const [customCoords, setCustomCoords] = useState<{
-    latitude: number
-    longitude: number
-  } | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('piggies-custom-coords')
-      if (saved) {
-        try {
-          return JSON.parse(saved)
-        } catch {
-          return null
-        }
-      }
-    }
-    return null
-  })
-  const [isSettingCustomLocation, setIsSettingCustomLocation] = useState(false)
+    const savedType = localStorage.getItem('piggies-location-type')
+    const locationType = (savedType === 'nearby' || savedType === 'custom') ? savedType : 'nearby'
 
-  // Persist location preference
+    let nearbyCoords = null
+    const savedNearbyCoords = localStorage.getItem('piggies-nearby-coords')
+    if (savedNearbyCoords) {
+      try { nearbyCoords = JSON.parse(savedNearbyCoords) } catch { /* ignore */ }
+    }
+
+    let customCoords = null
+    const savedCustomCoords = localStorage.getItem('piggies-custom-coords')
+    if (savedCustomCoords) {
+      try { customCoords = JSON.parse(savedCustomCoords) } catch { /* ignore */ }
+    }
+
+    const customLocation = localStorage.getItem('piggies-custom-location') || ''
+
+    return { locationType, nearbyCoords, customCoords, customLocation }
+  }
+
+  const [locationState, setLocationState] = useState(readLocationFromStorage)
+  const { locationType, nearbyCoords, customCoords, customLocation } = locationState
+
+  // Listen for location changes from AppHeader
   useEffect(() => {
-    localStorage.setItem('piggies-location-type', locationType)
-    if (customLocation) {
-      localStorage.setItem('piggies-custom-location', customLocation)
+    const handleLocationChange = () => {
+      setLocationState(readLocationFromStorage())
     }
-    if (nearbyLocationName) {
-      localStorage.setItem('piggies-nearby-location', nearbyLocationName)
-    }
-    if (nearbyCoords) {
-      localStorage.setItem('piggies-nearby-coords', JSON.stringify(nearbyCoords))
-    }
-    if (customCoords) {
-      localStorage.setItem('piggies-custom-coords', JSON.stringify(customCoords))
-    }
-  }, [locationType, customLocation, nearbyLocationName, nearbyCoords, customCoords])
-
-  const getLocationDisplayText = () => {
-    if (locationType === 'nearby') {
-      return nearbyLocationName || 'Nearby'
-    }
-    return customLocation || 'Set Location'
-  }
-
-  const handleUseMyLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser')
-      return
-    }
-
-    setIsGettingLocation(true)
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords
-        // Save the coordinates
-        setNearbyCoords({ latitude, longitude })
-        // Try to get city name from coordinates using reverse geocoding
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`,
-          )
-          const data = await response.json()
-          const city =
-            data.address?.city ||
-            data.address?.town ||
-            data.address?.village ||
-            data.address?.county ||
-            'Nearby'
-          setNearbyLocationName(city)
-        } catch {
-          setNearbyLocationName('Nearby')
-        }
-        setLocationType('nearby')
-        setIsGettingLocation(false)
-        setLocationDialogOpen(false)
-        toast.success('Location updated!')
-      },
-      (error) => {
-        setIsGettingLocation(false)
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            toast.error(
-              'Location access denied. Please enable location permissions.',
-            )
-            break
-          case error.POSITION_UNAVAILABLE:
-            toast.error('Location information unavailable.')
-            break
-          case error.TIMEOUT:
-            toast.error('Location request timed out.')
-            break
-          default:
-            toast.error('Unable to get your location.')
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    )
-  }
-
-  const handleSetCustomLocation = async () => {
-    if (!customLocationInput.trim()) {
-      toast.error('Please enter a city or zip code')
-      return
-    }
-
-    setIsSettingCustomLocation(true)
-
-    try {
-      // Geocode the input to get coordinates and proper city name
-      // Use countrycodes=us to restrict to US locations
-      const searchQuery = customLocationInput.trim()
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&addressdetails=1&countrycodes=us`,
-      )
-      const data = await response.json()
-
-      if (!data || data.length === 0) {
-        toast.error('Location not found. Please try a different city or zip code.')
-        setIsSettingCustomLocation(false)
-        return
-      }
-
-      // Find the best result - prefer cities/towns over other types
-      const result = data.find(
-        (r: { type?: string; class?: string }) =>
-          r.type === 'city' ||
-          r.type === 'town' ||
-          r.type === 'village' ||
-          r.type === 'administrative' ||
-          r.class === 'place'
-      ) || data[0]
-
-      const lat = parseFloat(result.lat)
-      const lon = parseFloat(result.lon)
-
-      // Extract the best city name from the result
-      const cityName =
-        result.address?.city ||
-        result.address?.town ||
-        result.address?.village ||
-        result.address?.municipality ||
-        result.address?.county ||
-        result.name ||
-        searchQuery
-
-      // Store coordinates and proper city name
-      setCustomCoords({ latitude: lat, longitude: lon })
-      setCustomLocation(cityName)
-      setLocationType('custom')
-      setLocationDialogOpen(false)
-      setCustomLocationInput('')
-      toast.success(`Location set to ${cityName}!`)
-    } catch (error) {
-      console.error('Geocoding error:', error)
-      toast.error('Failed to find location. Please try again.')
-    } finally {
-      setIsSettingCustomLocation(false)
-    }
-  }
+    window.addEventListener('location-changed', handleLocationChange)
+    return () => window.removeEventListener('location-changed', handleLocationChange)
+  }, [])
 
   // Get nearby users from Convex (including self)
   // Ultra members see more profiles
@@ -368,15 +205,6 @@ function NearbyPage() {
       : 'skip',
   )
 
-  // Sort to ensure self user always appears first
-  const nearbyUsers = nearbyUsersRaw
-    ? [...nearbyUsersRaw].sort((a, b) => {
-        if (a.isSelf) return -1
-        if (b.isSelf) return 1
-        return 0
-      })
-    : undefined
-
   // Get users who have sent unread messages to current user
   const usersWithUnreadMessages = useQuery(
     api.messages.getUsersWithUnreadMessages,
@@ -387,6 +215,40 @@ function NearbyPage() {
   const hasUnreadFrom = (userId: Id<'users'>) => {
     return usersWithUnreadMessages?.includes(userId) ?? false
   }
+
+  // Get favorite users
+  const favoriteUsersData = useQuery(
+    api.users.getFavoriteUsers,
+    convexUser?._id ? { userId: convexUser._id } : 'skip',
+  )
+
+  // Create a set of favorite user IDs for quick lookup
+  const favoriteUserIds = new Set(
+    favoriteUsersData?.map((f) => f.favoriteUser._id) ?? []
+  )
+
+  // Helper to check if a user is favorited
+  const isFavorited = (userId: Id<'users'>) => {
+    return favoriteUserIds.has(userId)
+  }
+
+  // Sort to ensure self user always appears first
+  const nearbyUsersSorted = nearbyUsersRaw
+    ? [...nearbyUsersRaw].sort((a, b) => {
+        if (a.isSelf) return -1
+        if (b.isSelf) return 1
+        return 0
+      })
+    : undefined
+
+  // Filter by favorites if enabled
+  const nearbyUsers = nearbyUsersSorted
+    ? favoritesOnly
+      ? nearbyUsersSorted.filter(
+          (u) => u.isSelf || favoriteUserIds.has(u._id)
+        )
+      : nearbyUsersSorted
+    : undefined
 
   const toggleCategory = (category: InterestCategory) => {
     setExpandedCategories((prev) => {
@@ -502,8 +364,8 @@ function NearbyPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Filter Bar */}
-      <div className="sticky top-14 z-40 bg-background border-b border-border px-4 py-2 flex items-center gap-2 overflow-x-auto">
-        {/* View Toggle - first on mobile */}
+      <div className="sticky top-14 z-40 bg-background border-b border-border px-4 py-2 flex items-center gap-2 overflow-x-auto scrollbar-none">
+        {/* View Toggle - on mobile only, at the start */}
         <Button
           variant="ghost"
           size="icon-sm"
@@ -527,156 +389,72 @@ function NearbyPage() {
         {/* Daily Views Indicator for Free Users - only in explore (custom location) mode */}
         {!isUltra && dailyLimits && locationType === 'custom' && (
           <div
-            className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full px-3 py-1.5 shrink-0 cursor-pointer hover:bg-amber-500/20 transition-colors"
+            className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-1 shrink-0 cursor-pointer hover:bg-amber-500/20 transition-colors"
             onClick={() => checkoutUrl && (window.location.href = checkoutUrl)}
           >
-            <Eye className="w-4 h-4 text-amber-500" />
+            <Eye className="w-3.5 h-3.5 text-amber-500" />
             <span className="text-xs font-medium text-amber-600">
-              {dailyLimits.profileViews.remaining}/{dailyLimits.profileViews.limit} views
+              {dailyLimits.profileViews.remaining}/{dailyLimits.profileViews.limit}
             </span>
           </div>
         )}
 
-        {/* Location Selector - hidden on mobile (shown in header) */}
-        <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
-          <DialogTrigger className="hidden sm:flex items-center gap-2 bg-card border border-border rounded-full px-3 py-1.5 hover:bg-accent transition-colors cursor-pointer shrink-0">
-            {locationType === 'custom' ? (
-              <Telescope className="w-4 h-4 text-primary" />
-            ) : (
-              <MapPin className="w-4 h-4 text-primary" />
-            )}
-            <span className="text-sm font-medium truncate max-w-[100px]">
-              {getLocationDisplayText()}
-            </span>
-            <ChevronDown className="w-3 h-3 text-muted-foreground" />
-          </DialogTrigger>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Set Your Location</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              {/* Use My Location Option */}
-              <button
-                onClick={handleUseMyLocation}
-                disabled={isGettingLocation}
-                className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                  locationType === 'nearby' && nearbyLocationName
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-primary/50'
-                } ${isGettingLocation ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
-              >
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                  {isGettingLocation ? (
-                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                  ) : (
-                    <Navigation className="w-5 h-5 text-primary" />
-                  )}
-                </div>
-                <div className="text-left">
-                  <p className="font-semibold text-foreground">
-                    Use My Location
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {isGettingLocation
-                      ? 'Getting location...'
-                      : nearbyLocationName
-                        ? `Currently: ${nearbyLocationName}`
-                        : 'Find people near you'}
-                  </p>
-                </div>
-              </button>
-
-              {/* Divider */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground">or</span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-
-              {/* City/Zip Input */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Telescope className="w-5 h-5 text-primary" />
-                  <p className="font-semibold text-foreground">
-                    Enter City or Zip Code
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="e.g., Miami or 33101"
-                    value={customLocationInput}
-                    onChange={(e) => setCustomLocationInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !isSettingCustomLocation) {
-                        handleSetCustomLocation()
-                      }
-                    }}
-                    disabled={isSettingCustomLocation}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={handleSetCustomLocation}
-                    size="sm"
-                    disabled={isSettingCustomLocation}
-                  >
-                    {isSettingCustomLocation ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      'Set'
-                    )}
-                  </Button>
-                </div>
-                {locationType === 'custom' && customLocation && (
-                  <p className="text-sm text-muted-foreground">
-                    Currently set to:{' '}
-                    <span className="text-primary font-medium">
-                      {customLocation}
-                    </span>
-                  </p>
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <div className="w-px h-6 bg-border shrink-0 hidden sm:block" />
+        {/* Separator */}
+        <div className="w-px h-6 bg-border shrink-0" />
         <Button
           variant={
-            onlineOnly || withPhotos || ageFilter || interestFilter.length > 0
+            onlineOnly || withPhotos || ageFilter || interestFilter.length > 0 || favoritesOnly
               ? 'default'
               : 'outline'
           }
           size="sm"
-          className={`shrink-0 gap-2 ${onlineOnly || withPhotos || ageFilter || interestFilter.length > 0 ? '' : 'border-border'}`}
+          className={`shrink-0 gap-2 ${onlineOnly || withPhotos || ageFilter || interestFilter.length > 0 || favoritesOnly ? '' : 'border-border'}`}
           onClick={() => {
             setOnlineOnly(false)
             setWithPhotos(false)
             setAgeFilter(null)
             setInterestFilter([])
+            setFavoritesOnly(false)
           }}
         >
           <Filter className="w-4 h-4" />
           <span className="hidden sm:inline">
-            {onlineOnly || withPhotos || ageFilter || interestFilter.length > 0
+            {onlineOnly || withPhotos || ageFilter || interestFilter.length > 0 || favoritesOnly
               ? 'Clear'
               : 'Filters'}
           </span>
         </Button>
+
+        {/* Favorites Filter */}
+        <Button
+          variant={favoritesOnly ? 'default' : 'outline'}
+          size="icon-sm"
+          className={`shrink-0 ${favoritesOnly ? 'bg-amber-500 hover:bg-amber-600 text-black' : 'border-border'}`}
+          onClick={() => setFavoritesOnly(!favoritesOnly)}
+          title={favoritesOnly ? 'Show all users' : 'Show favorites only'}
+        >
+          <Star className={`w-4 h-4 ${favoritesOnly ? 'fill-current' : ''}`} />
+        </Button>
+
         <Button
           variant={onlineOnly ? 'default' : 'outline'}
           size="sm"
-          className={`shrink-0 ${onlineOnly ? '' : 'border-border'}`}
+          className={`shrink-0 gap-1.5 ${onlineOnly ? '' : 'border-border'}`}
           onClick={() => setOnlineOnly(!onlineOnly)}
+          title="Online Now"
         >
-          Online Now
+          <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+          <span className="hidden sm:inline">Online</span>
         </Button>
         <Button
           variant={withPhotos ? 'default' : 'outline'}
           size="sm"
-          className={`shrink-0 ${withPhotos ? '' : 'border-border'}`}
+          className={`shrink-0 gap-1.5 ${withPhotos ? '' : 'border-border'}`}
           onClick={() => setWithPhotos(!withPhotos)}
+          title="With Photos"
         >
-          With Photos
+          <Image className="w-4 h-4" />
+          <span className="hidden sm:inline">Photos</span>
         </Button>
 
         {/* Interest Filter Button */}
@@ -685,12 +463,12 @@ function NearbyPage() {
             <Button
               variant={interestFilter.length > 0 ? 'default' : 'outline'}
               size="sm"
-              className={`shrink-0 gap-1.5 ${interestFilter.length > 0 ? '' : 'border-border'}`}
+              className={`shrink-0 gap-1 ${interestFilter.length > 0 ? '' : 'border-border'}`}
             >
               <Tags className="w-4 h-4" />
-              Interests
+              <span className="hidden sm:inline">Interests</span>
               {interestFilter.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-white/20 rounded-full">
+                <span className="px-1.5 py-0.5 text-xs bg-white/20 rounded-full">
                   {interestFilter.length}
                 </span>
               )}
@@ -797,7 +575,7 @@ function NearbyPage() {
             )
           }
         >
-          Age 18-25
+          <span className="hidden sm:inline">Age </span>18-25
         </Button>
         <Button
           variant={
@@ -815,7 +593,7 @@ function NearbyPage() {
             )
           }
         >
-          Age 25-35
+          <span className="hidden sm:inline">Age </span>25-35
         </Button>
         <Button
           variant={
@@ -833,9 +611,9 @@ function NearbyPage() {
             )
           }
         >
-          Age 35-50
+          <span className="hidden sm:inline">Age </span>35-50
         </Button>
-        {/* View Toggle - at end on desktop only */}
+        {/* View Toggle - at the end, desktop only */}
         <div className="ml-auto shrink-0 hidden sm:block">
           <Button
             variant="ghost"
@@ -865,22 +643,29 @@ function NearbyPage() {
           </div>
         ) : nearbyUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center px-4">
-            <Users className="w-16 h-16 text-muted-foreground mb-4" />
+            {favoritesOnly ? (
+              <Star className="w-16 h-16 text-muted-foreground mb-4" />
+            ) : (
+              <Users className="w-16 h-16 text-muted-foreground mb-4" />
+            )}
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              No users found
+              {favoritesOnly ? 'No favorites yet' : 'No users found'}
             </h3>
             <p className="text-muted-foreground">
-              {onlineOnly ||
-              withPhotos ||
-              ageFilter ||
-              interestFilter.length > 0
-                ? 'No one matches your filters. Try adjusting them.'
-                : 'Be the first to complete your profile and start connecting!'}
+              {favoritesOnly
+                ? 'Star profiles you like to see them here!'
+                : onlineOnly ||
+                    withPhotos ||
+                    ageFilter ||
+                    interestFilter.length > 0
+                  ? 'No one matches your filters. Try adjusting them.'
+                  : 'Be the first to complete your profile and start connecting!'}
             </p>
             {(onlineOnly ||
               withPhotos ||
               ageFilter ||
-              interestFilter.length > 0) && (
+              interestFilter.length > 0 ||
+              favoritesOnly) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -890,6 +675,7 @@ function NearbyPage() {
                   setWithPhotos(false)
                   setAgeFilter(null)
                   setInterestFilter([])
+                  setFavoritesOnly(false)
                 }}
               >
                 Clear Filters
@@ -905,11 +691,7 @@ function NearbyPage() {
                   <div
                     key={nearbyUser._id}
                     onClick={() => handleViewProfile(nearbyUser._id, nearbyUser.isSelf)}
-                    className={`profile-card aspect-[3/4] rounded-lg overflow-hidden cursor-pointer group relative bg-card ${
-                      !nearbyUser.isSelf && hasUnreadFrom(nearbyUser._id)
-                        ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-background'
-                        : ''
-                    }`}
+                    className="profile-card aspect-[3/4] rounded-lg overflow-hidden cursor-pointer group relative bg-card"
                   >
                     {getProfileImage(nearbyUser) ? (
                       <img
@@ -934,9 +716,25 @@ function NearbyPage() {
                       </div>
                     )}
 
-                    {/* Online indicator */}
-                    {nearbyUser.isOnline && !nearbyUser.isSelf && (
-                      <div className="absolute top-2 right-2 w-3 h-3 bg-online rounded-full border-2 border-black/50 online-indicator" />
+                    {/* Top-right indicators: online + unread message */}
+                    {!nearbyUser.isSelf && (
+                      <div className="absolute top-2 right-2 flex items-center gap-1">
+                        {nearbyUser.isOnline && (
+                          <div className="w-3 h-3 bg-online rounded-full border-2 border-black/50 online-indicator" />
+                        )}
+                        {hasUnreadFrom(nearbyUser._id) && (
+                          <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                            <MessageCircle className="w-3 h-3 text-white fill-white" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Favorite indicator */}
+                    {!nearbyUser.isSelf && isFavorited(nearbyUser._id) && (
+                      <div className="absolute top-2 left-2 w-5 h-5 bg-amber-500/90 rounded-full flex items-center justify-center">
+                        <Star className="w-3 h-3 text-white fill-white" />
+                      </div>
                     )}
 
                     {/* Gradient overlay */}
@@ -1024,11 +822,7 @@ function NearbyPage() {
                   <div
                     key={nearbyUser._id}
                     onClick={() => handleViewProfile(nearbyUser._id, nearbyUser.isSelf)}
-                    className={`bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:bg-card/80 transition-colors ${
-                      !nearbyUser.isSelf && hasUnreadFrom(nearbyUser._id)
-                        ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-background'
-                        : ''
-                    }`}
+                    className="bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:bg-card/80 transition-colors"
                   >
                     <div className="flex gap-4 p-4">
                       {/* Photo */}
@@ -1048,13 +842,28 @@ function NearbyPage() {
                             />
                           </div>
                         )}
-                        {/* Online indicator */}
-                        {nearbyUser.isOnline && !nearbyUser.isSelf && (
-                          <div className="absolute top-2 right-2 w-3 h-3 bg-online rounded-full border-2 border-black/50 online-indicator" />
+                        {/* Top-right indicators: online + unread message */}
+                        {!nearbyUser.isSelf && (
+                          <div className="absolute top-1 right-1 flex items-center gap-0.5">
+                            {nearbyUser.isOnline && (
+                              <div className="w-2.5 h-2.5 bg-online rounded-full border border-black/50 online-indicator" />
+                            )}
+                            {hasUnreadFrom(nearbyUser._id) && (
+                              <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                                <MessageCircle className="w-2.5 h-2.5 text-white fill-white" />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {/* Favorite indicator */}
+                        {!nearbyUser.isSelf && isFavorited(nearbyUser._id) && (
+                          <div className="absolute top-1 left-1 w-4 h-4 bg-amber-500/90 rounded-full flex items-center justify-center">
+                            <Star className="w-2.5 h-2.5 text-white fill-white" />
+                          </div>
                         )}
                         {/* "You" badge for self */}
                         {nearbyUser.isSelf && (
-                          <div className="absolute top-2 left-2 px-2 py-0.5 bg-primary text-white text-xs font-bold rounded-full">
+                          <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-primary text-white text-[10px] font-bold rounded-full">
                             You
                           </div>
                         )}
@@ -1077,6 +886,14 @@ function NearbyPage() {
                           </div>
                           {!nearbyUser.isSelf && (
                             <div className="flex items-center gap-1 shrink-0">
+                              {isFavorited(nearbyUser._id) && (
+                                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                              )}
+                              {hasUnreadFrom(nearbyUser._id) && (
+                                <Badge className="bg-red-500 text-white text-xs px-1.5">
+                                  <MessageCircle className="w-3 h-3" />
+                                </Badge>
+                              )}
                               {nearbyUser.isOnline ? (
                                 <Badge className="bg-online text-black text-xs">
                                   Online
