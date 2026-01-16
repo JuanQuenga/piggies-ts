@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // ============================================================================
 // SUBSCRIPTION-BASED LIMITS FOR ADMIRERS
@@ -8,6 +9,10 @@ const FREE_PROFILE_VIEWERS_LIMIT = 3;     // Free users can see last 3 profile v
 const FREE_WAVES_LIMIT = 3;               // Free users can see last 3 waves
 const ULTRA_PROFILE_VIEWERS_LIMIT = 50;   // Ultra users can see last 50 profile viewers
 const ULTRA_WAVES_LIMIT = 50;             // Ultra users can see last 50 waves
+
+// Wave sending rate limits (daily)
+const FREE_DAILY_WAVE_LIMIT = 15;         // Free users can send 15 waves per day
+// Ultra users have unlimited waves
 
 // ============================================================================
 // WAVES FUNCTIONS
@@ -19,10 +24,49 @@ export const sendWave = mutation({
     waverId: v.id("users"),
     wavedAtId: v.id("users"),
   },
-  returns: v.object({ success: v.boolean(), alreadyWaved: v.boolean() }),
+  returns: v.object({
+    success: v.boolean(),
+    alreadyWaved: v.boolean(),
+    rateLimited: v.optional(v.boolean()),
+    wavesRemaining: v.optional(v.number()),
+  }),
   handler: async (ctx, args) => {
     if (args.waverId === args.wavedAtId) {
       return { success: false, alreadyWaved: false };
+    }
+
+    // Get waver to check subscription status
+    const waver = await ctx.db.get(args.waverId);
+    if (!waver) {
+      return { success: false, alreadyWaved: false };
+    }
+
+    // Determine if user has Ultra subscription
+    const isUltra =
+      (waver.subscriptionTier === "ultra" && waver.subscriptionStatus === "active") ||
+      (waver.referralUltraExpiresAt !== undefined && waver.referralUltraExpiresAt > Date.now());
+
+    // Check rate limit for free users
+    if (!isUltra) {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const startOfDayTimestamp = startOfDay.getTime();
+
+      // Count waves sent today by this user
+      const wavesToday = await ctx.db
+        .query("waves")
+        .withIndex("by_waver", (q) => q.eq("waverId", args.waverId))
+        .filter((q) => q.gte(q.field("wavedAt"), startOfDayTimestamp))
+        .collect();
+
+      if (wavesToday.length >= FREE_DAILY_WAVE_LIMIT) {
+        return {
+          success: false,
+          alreadyWaved: false,
+          rateLimited: true,
+          wavesRemaining: 0,
+        };
+      }
     }
 
     // Check if already waved (only one active wave at a time per pair)
@@ -44,7 +88,36 @@ export const sendWave = mutation({
       wavedAt: Date.now(),
     });
 
-    return { success: true, alreadyWaved: false };
+    // Send push notification to the recipient
+    await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+      recipientUserId: args.wavedAtId,
+      title: "New Wave!",
+      body: "Someone waved at you! Check out who's interested.",
+      tag: "wave",
+      data: {
+        type: "wave" as const,
+        senderId: args.waverId,
+        url: "/interests",
+      },
+    });
+
+    // Calculate waves remaining for free users
+    let wavesRemaining: number | undefined;
+    if (!isUltra) {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const startOfDayTimestamp = startOfDay.getTime();
+
+      const wavesToday = await ctx.db
+        .query("waves")
+        .withIndex("by_waver", (q) => q.eq("waverId", args.waverId))
+        .filter((q) => q.gte(q.field("wavedAt"), startOfDayTimestamp))
+        .collect();
+
+      wavesRemaining = Math.max(0, FREE_DAILY_WAVE_LIMIT - wavesToday.length);
+    }
+
+    return { success: true, alreadyWaved: false, wavesRemaining };
   },
 });
 
@@ -63,6 +136,76 @@ export const hasWavedAt = query({
       )
       .unique();
     return wave !== null;
+  },
+});
+
+// Get user's daily wave sending limits and usage
+export const getWaveLimitStatus = query({
+  args: {
+    userId: v.id("users"),
+  },
+  returns: v.object({
+    isUltra: v.boolean(),
+    dailyLimit: v.union(v.number(), v.null()), // null = unlimited
+    wavesSentToday: v.number(),
+    wavesRemaining: v.union(v.number(), v.null()), // null = unlimited
+  }),
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      return {
+        isUltra: false,
+        dailyLimit: FREE_DAILY_WAVE_LIMIT,
+        wavesSentToday: 0,
+        wavesRemaining: FREE_DAILY_WAVE_LIMIT,
+      };
+    }
+
+    const isUltra =
+      (user.subscriptionTier === "ultra" && user.subscriptionStatus === "active") ||
+      (user.referralUltraExpiresAt !== undefined && user.referralUltraExpiresAt > Date.now());
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDayTimestamp = startOfDay.getTime();
+
+    const wavesToday = await ctx.db
+      .query("waves")
+      .withIndex("by_waver", (q) => q.eq("waverId", args.userId))
+      .filter((q) => q.gte(q.field("wavedAt"), startOfDayTimestamp))
+      .collect();
+
+    return {
+      isUltra,
+      dailyLimit: isUltra ? null : FREE_DAILY_WAVE_LIMIT,
+      wavesSentToday: wavesToday.length,
+      wavesRemaining: isUltra ? null : Math.max(0, FREE_DAILY_WAVE_LIMIT - wavesToday.length),
+    };
+  },
+});
+
+// Get count of new waves since user's last visit to interests page
+export const getNewWavesCount = query({
+  args: {
+    userId: v.id("users"),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      return 0;
+    }
+
+    const lastVisit = user.lastInterestsVisitAt ?? 0;
+
+    // Count waves received since last visit
+    const newWaves = await ctx.db
+      .query("waves")
+      .withIndex("by_wavedAt", (q) => q.eq("wavedAtId", args.userId))
+      .filter((q) => q.gt(q.field("wavedAt"), lastVisit))
+      .collect();
+
+    return newWaves.length;
   },
 });
 
@@ -345,5 +488,29 @@ export const getAdmirersStats = query({
       wavesLimit: isUltra ? ULTRA_WAVES_LIMIT : FREE_WAVES_LIMIT,
       viewersLimit: isUltra ? ULTRA_PROFILE_VIEWERS_LIMIT : FREE_PROFILE_VIEWERS_LIMIT,
     };
+  },
+});
+
+// ============================================================================
+// INTERESTS PAGE VISIT TRACKING
+// ============================================================================
+
+// Mark that the user has visited the interests page (clears badge count)
+export const markInterestsVisited = mutation({
+  args: {
+    userId: v.id("users"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      return null;
+    }
+
+    await ctx.db.patch(args.userId, {
+      lastInterestsVisitAt: Date.now(),
+    });
+
+    return null;
   },
 });

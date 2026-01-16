@@ -35,6 +35,7 @@ import {
   ChevronDown,
   Navigation,
   Loader2,
+  Store,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
@@ -239,7 +240,9 @@ export function AppHeader() {
 
   // Navigation items for desktop header
   const navItems = [
+    { icon: Store, label: 'Community', path: '/community' },
     { icon: MapPin, label: 'Nearby', path: '/nearby' },
+    { icon: Heart, label: 'Interests', path: '/interests' },
     { icon: MessageCircle, label: 'Messages', path: '/messages', badge: unreadCount ?? 0 },
     { icon: ImageIcon, label: 'Photos', path: '/photos' },
   ]
@@ -286,18 +289,6 @@ export function AppHeader() {
               </Button>
             )
           })}
-          {/* Interests button */}
-          <Button
-            variant="ghost"
-            className={cn(
-              "flex items-center gap-2 px-3",
-              isActive('/interests') ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => navigate({ to: '/interests' })}
-          >
-            <Heart className={cn("w-5 h-5", isActive('/interests') ? "text-primary" : "")} />
-            <span className="text-sm font-medium">Interests</span>
-          </Button>
         </nav>
 
         {/* Right side: Location selector + User menu */}

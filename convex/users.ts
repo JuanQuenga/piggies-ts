@@ -108,6 +108,8 @@ export const getCurrentUser = query({
       isSuspended: v.optional(v.boolean()),
       suspendedUntil: v.optional(v.number()),
       warningCount: v.optional(v.number()),
+      // UI state tracking
+      lastInterestsVisitAt: v.optional(v.number()),
     }),
     v.null()
   ),
@@ -158,6 +160,8 @@ export const getUser = query({
       isSuspended: v.optional(v.boolean()),
       suspendedUntil: v.optional(v.number()),
       warningCount: v.optional(v.number()),
+      // UI state tracking
+      lastInterestsVisitAt: v.optional(v.number()),
     }),
     v.null()
   ),

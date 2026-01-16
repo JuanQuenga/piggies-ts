@@ -2,7 +2,7 @@ import { Link, useLocation } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { MessageCircle, MapPin, ImageIcon, Heart } from 'lucide-react'
+import { MessageCircle, MapPin, ImageIcon, Heart, Store } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface NavItem {
@@ -19,10 +19,21 @@ export function MobileBottomNav() {
   // Fetch unread message count
   const unreadCount = useQuery(
     api.messages.getUnreadCount,
-    user?._id ? { userId: user._id } : "skip"
+    user?._id ? { userId: user._id } : 'skip',
+  )
+
+  // Fetch new waves count for interests badge
+  const newWavesCount = useQuery(
+    api.admirers.getNewWavesCount,
+    user?._id ? { userId: user._id } : 'skip',
   )
 
   const navItems: NavItem[] = [
+    {
+      icon: Store,
+      label: 'Community',
+      path: '/community',
+    },
     {
       icon: MapPin,
       label: 'Nearby',
@@ -32,6 +43,7 @@ export function MobileBottomNav() {
       icon: Heart,
       label: 'Interests',
       path: '/interests',
+      badge: newWavesCount ?? 0,
     },
     {
       icon: MessageCircle,
@@ -64,8 +76,10 @@ export function MobileBottomNav() {
                 to={item.path}
                 activeOptions={{ exact: true }}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 h-14 px-4 relative rounded-md touch-manipulation",
-                  active ? "text-primary" : "text-muted-foreground active:text-foreground"
+                  'flex flex-col items-center justify-center gap-0.5 h-14 px-4 relative rounded-md touch-manipulation',
+                  active
+                    ? 'text-primary'
+                    : 'text-muted-foreground active:text-foreground',
                 )}
               >
                 <div className="relative">

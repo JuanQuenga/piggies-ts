@@ -4,12 +4,7 @@ import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useSubscription } from '@/hooks/useSubscription'
-import {
-  Loader2,
-  Lock,
-  Unlock,
-  FolderOpen,
-} from 'lucide-react'
+import { Loader2, Lock, Unlock, FolderOpen } from 'lucide-react'
 import { PrivateAlbumManager } from '@/components/albums/PrivateAlbumManager'
 import { AlbumList } from '@/components/albums/AlbumList'
 import { UnlockedAlbumsTab } from '@/components/photos/UnlockedAlbumsTab'
@@ -26,23 +21,37 @@ function PhotosPage() {
   const { user, isLoading: isUserLoading } = useCurrentUser()
   const { isUltra, isLoading: isSubLoading } = useSubscription()
   const [activeTab, setActiveTab] = useState<PhotosTab | null>(null)
-  const [selectedAlbumId, setSelectedAlbumId] = useState<Id<"privateAlbums"> | null>(null)
+  const [selectedAlbumId, setSelectedAlbumId] =
+    useState<Id<'privateAlbums'> | null>(null)
   const [defaultAlbumCreated, setDefaultAlbumCreated] = useState(false)
 
   // For free users, get or create their default album
   const defaultAlbum = useQuery(
     api.albums.getDefaultAlbum,
-    user && !isUltra ? { userId: user._id } : "skip"
+    user && !isUltra ? { userId: user._id } : 'skip',
   )
   const createDefaultAlbum = useMutation(api.albums.getOrCreateDefaultAlbum)
 
   // Auto-create default album for free users if they don't have one
   useEffect(() => {
-    if (user && !isUltra && !isSubLoading && defaultAlbum === null && !defaultAlbumCreated) {
+    if (
+      user &&
+      !isUltra &&
+      !isSubLoading &&
+      defaultAlbum === null &&
+      !defaultAlbumCreated
+    ) {
       setDefaultAlbumCreated(true)
       createDefaultAlbum({ userId: user._id })
     }
-  }, [user, isUltra, isSubLoading, defaultAlbum, defaultAlbumCreated, createDefaultAlbum])
+  }, [
+    user,
+    isUltra,
+    isSubLoading,
+    defaultAlbum,
+    defaultAlbumCreated,
+    createDefaultAlbum,
+  ])
 
   // Set default tab once subscription status is known
   useEffect(() => {
@@ -63,7 +72,10 @@ function PhotosPage() {
       ]
 
   // Wait for all necessary data to load
-  const isLoading = isUserLoading || isSubLoading || activeTab === null ||
+  const isLoading =
+    isUserLoading ||
+    isSubLoading ||
+    activeTab === null ||
     (!isUltra && defaultAlbum === undefined)
 
   if (isLoading) {
@@ -77,12 +89,14 @@ function PhotosPage() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Please sign in to view your photos</p>
+        <p className="text-muted-foreground">
+          Please sign in to view your photos
+        </p>
       </div>
     )
   }
 
-  const handleSelectAlbum = (albumId: Id<"privateAlbums">) => {
+  const handleSelectAlbum = (albumId: Id<'privateAlbums'>) => {
     setSelectedAlbumId(albumId)
   }
 
@@ -152,14 +166,14 @@ function PhotosPage() {
                     setSelectedAlbumId(null) // Clear selection when changing tabs
                   }}
                   className={cn(
-                    "flex-1 min-w-0 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors whitespace-nowrap px-4",
+                    'flex-1 min-w-0 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors whitespace-nowrap px-4',
                     activeTab === tab.id
-                      ? "text-primary border-b-2 border-primary"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? 'text-primary border-b-2 border-primary'
+                      : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   <Icon className="w-4 h-4" />
-                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="inline">{tab.label}</span>
                 </button>
               )
             })}

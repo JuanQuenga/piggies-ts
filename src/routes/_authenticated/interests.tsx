@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -47,6 +48,14 @@ function InterestsPage() {
   )
 
   const sendWave = useMutation(api.admirers.sendWave)
+  const markInterestsVisited = useMutation(api.admirers.markInterestsVisited)
+
+  // Mark interests as visited when page loads (clears badge)
+  useEffect(() => {
+    if (user?._id) {
+      markInterestsVisited({ userId: user._id })
+    }
+  }, [user?._id, markInterestsVisited])
 
   // Wave animation state
   const [wavingUsers, setWavingUsers] = useState<Record<string, 'waving' | 'success'>>({})
@@ -58,12 +67,32 @@ function InterestsPage() {
     setWavingUsers(prev => ({ ...prev, [targetUserId]: 'waving' }))
 
     try {
-      await sendWave({ waverId: user._id, wavedAtId: targetUserId as any })
+      const result = await sendWave({ waverId: user._id, wavedAtId: targetUserId as any })
+
+      // Check if rate limited
+      if (result.rateLimited) {
+        setWavingUsers(prev => {
+          const next = { ...prev }
+          delete next[targetUserId]
+          return next
+        })
+        toast.error('Daily wave limit reached', {
+          description: isUltra
+            ? 'Something went wrong'
+            : 'Upgrade to Ultra for unlimited waves!',
+        })
+        return
+      }
 
       // After animation, show success
       setTimeout(() => {
         setWavingUsers(prev => ({ ...prev, [targetUserId]: 'success' }))
       }, 800)
+
+      // Show waves remaining toast for free users (if not already waved)
+      if (!result.alreadyWaved && result.wavesRemaining !== undefined && result.wavesRemaining <= 5) {
+        toast.info(`${result.wavesRemaining} waves remaining today`)
+      }
 
       // Clear success state after a bit
       setTimeout(() => {
@@ -80,6 +109,7 @@ function InterestsPage() {
         delete next[targetUserId]
         return next
       })
+      toast.error('Failed to send wave')
     }
   }
 

@@ -22,9 +22,18 @@ import {
   Sparkles,
   ArrowLeft,
   Pencil,
+  Users,
 } from "lucide-react"
 import { toast } from "sonner"
 import { AlbumPhotoUpload } from "./AlbumPhotoUpload"
+import { AlbumAccessTab } from "@/components/photos/AlbumAccessTab"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 
 interface PrivateAlbumManagerProps {
@@ -47,6 +56,7 @@ export function PrivateAlbumManager({
   const [showEditName, setShowEditName] = useState(false)
   const [newName, setNewName] = useState("")
   const [isUpdatingName, setIsUpdatingName] = useState(false)
+  const [showAccessSheet, setShowAccessSheet] = useState(false)
 
   // If albumId is provided, get album photos; otherwise use legacy query
   const albumPhotos = useQuery(
@@ -144,12 +154,24 @@ export function PrivateAlbumManager({
             </p>
           </div>
         </div>
-        {!isAtLimit && (
-          <Button onClick={() => setShowUpload(true)}>
-            <ImagePlus className="w-4 h-4 mr-2" />
-            Add Photo
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {!isUltra && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowAccessSheet(true)}
+              title="Manage Access"
+            >
+              <Users className="w-4 h-4" />
+            </Button>
+          )}
+          {!isAtLimit && (
+            <Button onClick={() => setShowUpload(true)}>
+              <ImagePlus className="w-4 h-4 mr-2" />
+              Add Photo
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Upgrade prompt for free users at limit */}
@@ -373,6 +395,21 @@ export function PrivateAlbumManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Access management sheet for free users */}
+      <Sheet open={showAccessSheet} onOpenChange={setShowAccessSheet}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Manage Access</SheetTitle>
+            <SheetDescription>
+              See who can view your private album and revoke access
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-8 pt-4">
+            <AlbumAccessTab userId={userId} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

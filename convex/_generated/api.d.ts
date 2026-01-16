@@ -15,8 +15,11 @@ import type * as crons from "../crons.js";
 import type * as dev from "../dev.js";
 import type * as lookingNow from "../lookingNow.js";
 import type * as messages from "../messages.js";
+import type * as pushNotifications from "../pushNotifications.js";
+import type * as pushNotificationsNode from "../pushNotificationsNode.js";
 import type * as referrals from "../referrals.js";
 import type * as users from "../users.js";
+import type * as venues from "../venues.js";
 
 import type {
   ApiFromModules,
@@ -32,8 +35,11 @@ declare const fullApi: ApiFromModules<{
   dev: typeof dev;
   lookingNow: typeof lookingNow;
   messages: typeof messages;
+  pushNotifications: typeof pushNotifications;
+  pushNotificationsNode: typeof pushNotificationsNode;
   referrals: typeof referrals;
   users: typeof users;
+  venues: typeof venues;
 }>;
 
 /**

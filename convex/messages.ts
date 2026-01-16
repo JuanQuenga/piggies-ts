@@ -146,6 +146,29 @@ export const sendMessage = mutation({
       lastMessageTime: sentAt,
     });
 
+    // Send push notification to receiver
+    const notificationBody = args.format === "text"
+      ? args.content.substring(0, 100)
+      : args.format === "image" ? "Sent you a photo"
+      : args.format === "video" ? "Sent you a video"
+      : args.format === "gif" ? "Sent you a GIF"
+      : args.format === "location" ? "Shared a location"
+      : args.format === "album_share" ? "Shared an album with you"
+      : "Sent you a message";
+
+    await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+      recipientUserId: args.receiverId,
+      title: "New Message",
+      body: notificationBody,
+      tag: `message-${conversationId}`,
+      data: {
+        type: "message" as const,
+        conversationId,
+        senderId: args.senderId,
+        url: `/messages?conversation=${conversationId}`,
+      },
+    });
+
     return messageId;
   },
 });
@@ -195,6 +218,36 @@ export const sendMessageToConversation = mutation({
       lastMessageId: messageId,
       lastMessageTime: sentAt,
     });
+
+    // Find the recipient (other participant in the conversation)
+    const recipientUserId = conversation.participantIds.find(
+      (id) => id !== args.senderId
+    );
+
+    // Send push notification to recipient
+    if (recipientUserId) {
+      const notificationBody = args.format === "text"
+        ? args.content.substring(0, 100)
+        : args.format === "image" ? "Sent you a photo"
+        : args.format === "video" ? "Sent you a video"
+        : args.format === "gif" ? "Sent you a GIF"
+        : args.format === "location" ? "Shared a location"
+        : args.format === "album_share" ? "Shared an album with you"
+        : "Sent you a message";
+
+      await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+        recipientUserId,
+        title: "New Message",
+        body: notificationBody,
+        tag: `message-${args.conversationId}`,
+        data: {
+          type: "message" as const,
+          conversationId: args.conversationId,
+          senderId: args.senderId,
+          url: `/messages?conversation=${args.conversationId}`,
+        },
+      });
+    }
 
     return messageId;
   },

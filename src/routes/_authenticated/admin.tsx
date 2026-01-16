@@ -7,6 +7,7 @@ import {
   Users,
   ArrowLeft,
   Shield,
+  Store,
 } from 'lucide-react'
 import { useEffect } from 'react'
 
@@ -47,6 +48,7 @@ function AdminLayout() {
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/admin/reports', icon: Flag, label: 'Reports' },
     { to: '/admin/users', icon: Users, label: 'Users' },
+    { to: '/admin/venues', icon: Store, label: 'Venues' },
   ]
 
   const isActive = (path: string) => {

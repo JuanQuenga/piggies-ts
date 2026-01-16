@@ -28,12 +28,14 @@ import { Route as AuthenticatedNearbyRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
 import { Route as AuthenticatedLookingNowRouteImport } from './routes/_authenticated/looking-now'
 import { Route as AuthenticatedInterestsRouteImport } from './routes/_authenticated/interests'
+import { Route as AuthenticatedCommunityRouteImport } from './routes/_authenticated/community'
 import { Route as AuthenticatedAlbumRouteImport } from './routes/_authenticated/album'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as ApiWebhookPolarRouteImport } from './routes/api/webhook/polar'
 import { Route as ApiAuthCallbackRouteImport } from './routes/api/auth/callback'
 import { Route as AuthenticatedUserUserIdRouteImport } from './routes/_authenticated/user.$userId'
+import { Route as AuthenticatedAdminVenuesRouteImport } from './routes/_authenticated/admin/venues'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin/reports'
 
@@ -132,6 +134,11 @@ const AuthenticatedInterestsRoute = AuthenticatedInterestsRouteImport.update({
   path: '/interests',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCommunityRoute = AuthenticatedCommunityRouteImport.update({
+  id: '/community',
+  path: '/community',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAlbumRoute = AuthenticatedAlbumRouteImport.update({
   id: '/album',
   path: '/album',
@@ -162,6 +169,12 @@ const AuthenticatedUserUserIdRoute = AuthenticatedUserUserIdRouteImport.update({
   path: '/user/$userId',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdminVenuesRoute =
+  AuthenticatedAdminVenuesRouteImport.update({
+    id: '/venues',
+    path: '/venues',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -182,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/album': typeof AuthenticatedAlbumRoute
+  '/community': typeof AuthenticatedCommunityRoute
   '/interests': typeof AuthenticatedInterestsRoute
   '/looking-now': typeof AuthenticatedLookingNowRoute
   '/messages': typeof AuthenticatedMessagesRoute
@@ -197,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/api/portal': typeof ApiPortalRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/admin/venues': typeof AuthenticatedAdminVenuesRoute
   '/user/$userId': typeof AuthenticatedUserUserIdRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
   '/api/webhook/polar': typeof ApiWebhookPolarRoute
@@ -209,6 +224,7 @@ export interface FileRoutesByTo {
   '/legal': typeof LegalRoute
   '/login': typeof LoginRoute
   '/album': typeof AuthenticatedAlbumRoute
+  '/community': typeof AuthenticatedCommunityRoute
   '/interests': typeof AuthenticatedInterestsRoute
   '/looking-now': typeof AuthenticatedLookingNowRoute
   '/messages': typeof AuthenticatedMessagesRoute
@@ -224,6 +240,7 @@ export interface FileRoutesByTo {
   '/api/portal': typeof ApiPortalRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/admin/venues': typeof AuthenticatedAdminVenuesRoute
   '/user/$userId': typeof AuthenticatedUserUserIdRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
   '/api/webhook/polar': typeof ApiWebhookPolarRoute
@@ -239,6 +256,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/album': typeof AuthenticatedAlbumRoute
+  '/_authenticated/community': typeof AuthenticatedCommunityRoute
   '/_authenticated/interests': typeof AuthenticatedInterestsRoute
   '/_authenticated/looking-now': typeof AuthenticatedLookingNowRoute
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
@@ -254,6 +272,7 @@ export interface FileRoutesById {
   '/api/portal': typeof ApiPortalRoute
   '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/_authenticated/admin/venues': typeof AuthenticatedAdminVenuesRoute
   '/_authenticated/user/$userId': typeof AuthenticatedUserUserIdRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
   '/api/webhook/polar': typeof ApiWebhookPolarRoute
@@ -269,6 +288,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin'
     | '/album'
+    | '/community'
     | '/interests'
     | '/looking-now'
     | '/messages'
@@ -284,6 +304,7 @@ export interface FileRouteTypes {
     | '/api/portal'
     | '/admin/reports'
     | '/admin/users'
+    | '/admin/venues'
     | '/user/$userId'
     | '/api/auth/callback'
     | '/api/webhook/polar'
@@ -296,6 +317,7 @@ export interface FileRouteTypes {
     | '/legal'
     | '/login'
     | '/album'
+    | '/community'
     | '/interests'
     | '/looking-now'
     | '/messages'
@@ -311,6 +333,7 @@ export interface FileRouteTypes {
     | '/api/portal'
     | '/admin/reports'
     | '/admin/users'
+    | '/admin/venues'
     | '/user/$userId'
     | '/api/auth/callback'
     | '/api/webhook/polar'
@@ -325,6 +348,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/admin'
     | '/_authenticated/album'
+    | '/_authenticated/community'
     | '/_authenticated/interests'
     | '/_authenticated/looking-now'
     | '/_authenticated/messages'
@@ -340,6 +364,7 @@ export interface FileRouteTypes {
     | '/api/portal'
     | '/_authenticated/admin/reports'
     | '/_authenticated/admin/users'
+    | '/_authenticated/admin/venues'
     | '/_authenticated/user/$userId'
     | '/api/auth/callback'
     | '/api/webhook/polar'
@@ -494,6 +519,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInterestsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/community': {
+      id: '/_authenticated/community'
+      path: '/community'
+      fullPath: '/community'
+      preLoaderRoute: typeof AuthenticatedCommunityRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/album': {
       id: '/_authenticated/album'
       path: '/album'
@@ -536,6 +568,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUserUserIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/venues': {
+      id: '/_authenticated/admin/venues'
+      path: '/venues'
+      fullPath: '/admin/venues'
+      preLoaderRoute: typeof AuthenticatedAdminVenuesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
       path: '/users'
@@ -556,12 +595,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminReportsRoute: typeof AuthenticatedAdminReportsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
+  AuthenticatedAdminVenuesRoute: typeof AuthenticatedAdminVenuesRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
+  AuthenticatedAdminVenuesRoute: AuthenticatedAdminVenuesRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
@@ -571,6 +612,7 @@ const AuthenticatedAdminRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedAlbumRoute: typeof AuthenticatedAlbumRoute
+  AuthenticatedCommunityRoute: typeof AuthenticatedCommunityRoute
   AuthenticatedInterestsRoute: typeof AuthenticatedInterestsRoute
   AuthenticatedLookingNowRoute: typeof AuthenticatedLookingNowRoute
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
@@ -588,6 +630,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedAlbumRoute: AuthenticatedAlbumRoute,
+  AuthenticatedCommunityRoute: AuthenticatedCommunityRoute,
   AuthenticatedInterestsRoute: AuthenticatedInterestsRoute,
   AuthenticatedLookingNowRoute: AuthenticatedLookingNowRoute,
   AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,

@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useAuth } from '@workos/authkit-tanstack-react-start/client'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useSubscription } from '@/hooks/useSubscription'
+import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useMutation } from 'convex/react'
@@ -56,22 +57,48 @@ function SettingsPage() {
   const { activatedReferrals, hasReferralUltra, referralUltraDaysRemaining } = useReferrals()
   const updatePreferences = useMutation(api.users.updateUserPreferences)
 
+  // Push notifications hook
+  const {
+    isSupported: pushSupported,
+    isSubscribed: pushSubscribed,
+    isLoading: pushLoading,
+    subscribe: subscribeToPush,
+    unsubscribe: unsubscribeFromPush,
+  } = usePushNotifications(convexUser?._id)
+
   // Use values from database with defaults
-  const pushNotifications = convexUser?.pushNotificationsEnabled ?? true
+  const pushNotifications = convexUser?.pushNotificationsEnabled ?? false
   const emailNotifications = convexUser?.emailNotificationsEnabled ?? true
   const locationSharing = convexUser?.locationSharingEnabled ?? true
   const showOnlineStatus = convexUser?.showOnlineStatus ?? true
   const hideFromDiscovery = convexUser?.hideFromDiscovery ?? false
 
   const handleTogglePushNotifications = async () => {
-    if (!convexUser?._id) return
-    const newValue = !pushNotifications
+    if (!convexUser?._id || pushLoading) return
+
     try {
-      await updatePreferences({
-        userId: convexUser._id,
-        pushNotificationsEnabled: newValue,
-      })
-      toast.success(newValue ? 'Push notifications enabled' : 'Push notifications disabled')
+      if (pushNotifications) {
+        // Disabling - just update preference
+        await updatePreferences({
+          userId: convexUser._id,
+          pushNotificationsEnabled: false,
+        })
+        toast.success('Push notifications disabled')
+      } else {
+        // Enabling - subscribe if needed, then update preference
+        if (!pushSubscribed && pushSupported) {
+          const success = await subscribeToPush()
+          if (!success) {
+            toast.error('Failed to enable push notifications. Please allow notifications in your browser settings.')
+            return
+          }
+        }
+        await updatePreferences({
+          userId: convexUser._id,
+          pushNotificationsEnabled: true,
+        })
+        toast.success('Push notifications enabled')
+      }
     } catch {
       toast.error('Failed to update notification settings')
     }

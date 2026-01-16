@@ -45,6 +45,9 @@ export default defineSchema({
     isSuspended: v.optional(v.boolean()),           // Temporarily suspended
     suspendedUntil: v.optional(v.number()),         // Suspension end time
     warningCount: v.optional(v.number()),           // Number of warnings issued
+
+    // UI state tracking
+    lastInterestsVisitAt: v.optional(v.number()),   // When user last visited interests page
   })
     .index("by_email", ["email"])
     .index("by_workosId", ["workosId"])
@@ -288,6 +291,120 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_createdAt", ["createdAt"])
     .index("by_isActive_createdAt", ["isActive", "createdAt"]),
+
+  // ============================================================================
+  // PUSH SUBSCRIPTIONS TABLE
+  // ============================================================================
+  pushSubscriptions: defineTable({
+    userId: v.id("users"),
+    endpoint: v.string(),                    // Push service endpoint URL
+    p256dh: v.string(),                      // Client public key
+    auth: v.string(),                        // Auth secret
+    userAgent: v.optional(v.string()),       // Device identifier for debugging
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),      // Track when last notification was sent
+  })
+    .index("by_userId", ["userId"])
+    .index("by_endpoint", ["endpoint"]),
+
+  // ============================================================================
+  // COMMUNITY VENUES TABLE
+  // ============================================================================
+  communityVenues: defineTable({
+    // Basic venue info
+    name: v.string(),
+    description: v.optional(v.string()),
+    category: v.union(
+      v.literal("bars_nightlife"),
+      v.literal("adult_venues"),
+      v.literal("fitness_wellness"),
+      v.literal("events_social"),
+      v.literal("health_clinics")
+    ),
+
+    // Location
+    latitude: v.number(),
+    longitude: v.number(),
+    address: v.string(),
+    city: v.string(),
+    state: v.optional(v.string()),
+    country: v.string(),
+
+    // Contact & Links
+    phone: v.optional(v.string()),
+    website: v.optional(v.string()),
+    instagram: v.optional(v.string()),
+
+    // Features/amenities (array of tags)
+    features: v.optional(v.array(v.string())),
+
+    // Hours
+    hoursNote: v.optional(v.string()), // e.g., "Mon-Fri 6PM-2AM, Sat-Sun 8PM-4AM"
+
+    // Submission metadata
+    submittedBy: v.id("users"),
+    submittedAt: v.number(),
+
+    // Moderation
+    status: v.union(
+      v.literal("pending"),      // Awaiting review
+      v.literal("approved"),     // Visible to all users
+      v.literal("rejected"),     // Rejected by admin
+      v.literal("flagged")       // Reported by users, under review
+    ),
+
+    // Admin moderation fields
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    rejectionReason: v.optional(v.string()),
+
+    // Engagement metrics
+    viewCount: v.optional(v.number()),
+    favoriteCount: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_category", ["category"])
+    .index("by_category_status", ["category", "status"])
+    .index("by_submittedBy", ["submittedBy"])
+    .index("by_city", ["city"])
+    .searchIndex("search_venue", {
+      searchField: "name",
+      filterFields: ["category", "status", "city"],
+    }),
+
+  // ============================================================================
+  // VENUE FAVORITES TABLE
+  // ============================================================================
+  venueFavorites: defineTable({
+    userId: v.id("users"),
+    venueId: v.id("communityVenues"),
+    favoritedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_venue", ["venueId"])
+    .index("by_user_venue", ["userId", "venueId"]),
+
+  // ============================================================================
+  // VENUE REPORTS TABLE
+  // ============================================================================
+  venueReports: defineTable({
+    venueId: v.id("communityVenues"),
+    reporterId: v.id("users"),
+    reason: v.union(
+      v.literal("closed_permanently"),
+      v.literal("incorrect_info"),
+      v.literal("inappropriate"),
+      v.literal("duplicate"),
+      v.literal("other")
+    ),
+    details: v.optional(v.string()),
+    reportedAt: v.number(),
+    status: v.union(v.literal("pending"), v.literal("reviewed"), v.literal("resolved")),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+  })
+    .index("by_venue", ["venueId"])
+    .index("by_status", ["status"]),
 });
 
 

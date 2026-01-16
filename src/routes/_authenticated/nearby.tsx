@@ -97,6 +97,7 @@ function NearbyPage() {
   } | null>(null)
   const [interestFilter, setInterestFilter] = useState<string[]>([])
   const [interestDialogOpen, setInterestDialogOpen] = useState(false)
+  const [dailyViewsDialogOpen, setDailyViewsDialogOpen] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<
     Set<InterestCategory>
   >(new Set(['hobbies']))
@@ -106,23 +107,63 @@ function NearbyPage() {
     Record<string, 'waving' | 'success'>
   >({})
 
-  const handleWaveWithAnimation = (userId: string) => {
+  // Wave mutation
+  const sendWave = useMutation(api.admirers.sendWave)
+
+  const handleWaveWithAnimation = async (userId: string) => {
+    if (!convexUser?._id) return
+
     // Set to waving state
     setWavingUsers((prev) => ({ ...prev, [userId]: 'waving' }))
 
-    // After animation, show success
-    setTimeout(() => {
-      setWavingUsers((prev) => ({ ...prev, [userId]: 'success' }))
-    }, 800)
+    try {
+      const result = await sendWave({
+        waverId: convexUser._id,
+        wavedAtId: userId as Id<'users'>,
+      })
 
-    // Clear success state after a bit
-    setTimeout(() => {
+      // Check if rate limited
+      if (result.rateLimited) {
+        setWavingUsers((prev) => {
+          const next = { ...prev }
+          delete next[userId]
+          return next
+        })
+        toast.error('Daily wave limit reached', {
+          description: isUltra
+            ? 'Something went wrong'
+            : 'Upgrade to Ultra for unlimited waves!',
+        })
+        return
+      }
+
+      // Show success after animation
+      setTimeout(() => {
+        setWavingUsers((prev) => ({ ...prev, [userId]: 'success' }))
+      }, 800)
+
+      // Show waves remaining toast for free users (if not already waved)
+      if (!result.alreadyWaved && result.wavesRemaining !== undefined && result.wavesRemaining <= 5) {
+        toast.info(`${result.wavesRemaining} waves remaining today`)
+      }
+
+      // Clear success state after a bit
+      setTimeout(() => {
+        setWavingUsers((prev) => {
+          const next = { ...prev }
+          delete next[userId]
+          return next
+        })
+      }, 2500)
+    } catch (error) {
+      // Clear on error
       setWavingUsers((prev) => {
         const next = { ...prev }
         delete next[userId]
         return next
       })
-    }, 2500)
+      toast.error('Failed to send wave')
+    }
   }
 
   // Location state - reads from localStorage, managed by AppHeader
@@ -136,18 +177,27 @@ function NearbyPage() {
       }
     }
     const savedType = localStorage.getItem('piggies-location-type')
-    const locationType = (savedType === 'nearby' || savedType === 'custom') ? savedType : 'nearby'
+    const locationType =
+      savedType === 'nearby' || savedType === 'custom' ? savedType : 'nearby'
 
     let nearbyCoords = null
     const savedNearbyCoords = localStorage.getItem('piggies-nearby-coords')
     if (savedNearbyCoords) {
-      try { nearbyCoords = JSON.parse(savedNearbyCoords) } catch { /* ignore */ }
+      try {
+        nearbyCoords = JSON.parse(savedNearbyCoords)
+      } catch {
+        /* ignore */
+      }
     }
 
     let customCoords = null
     const savedCustomCoords = localStorage.getItem('piggies-custom-coords')
     if (savedCustomCoords) {
-      try { customCoords = JSON.parse(savedCustomCoords) } catch { /* ignore */ }
+      try {
+        customCoords = JSON.parse(savedCustomCoords)
+      } catch {
+        /* ignore */
+      }
     }
 
     const customLocation = localStorage.getItem('piggies-custom-location') || ''
@@ -156,7 +206,8 @@ function NearbyPage() {
   }
 
   const [locationState, setLocationState] = useState(readLocationFromStorage)
-  const { locationType, nearbyCoords, customCoords, customLocation } = locationState
+  const { locationType, nearbyCoords, customCoords, customLocation } =
+    locationState
 
   // Listen for location changes from AppHeader
   useEffect(() => {
@@ -164,7 +215,8 @@ function NearbyPage() {
       setLocationState(readLocationFromStorage())
     }
     window.addEventListener('location-changed', handleLocationChange)
-    return () => window.removeEventListener('location-changed', handleLocationChange)
+    return () =>
+      window.removeEventListener('location-changed', handleLocationChange)
   }, [])
 
   // Get nearby users from Convex (including self)
@@ -224,7 +276,7 @@ function NearbyPage() {
 
   // Create a set of favorite user IDs for quick lookup
   const favoriteUserIds = new Set(
-    favoriteUsersData?.map((f) => f.favoriteUser._id) ?? []
+    favoriteUsersData?.map((f) => f.favoriteUser._id) ?? [],
   )
 
   // Helper to check if a user is favorited
@@ -244,9 +296,7 @@ function NearbyPage() {
   // Filter by favorites if enabled
   const nearbyUsers = nearbyUsersSorted
     ? favoritesOnly
-      ? nearbyUsersSorted.filter(
-          (u) => u.isSelf || favoriteUserIds.has(u._id)
-        )
+      ? nearbyUsersSorted.filter((u) => u.isSelf || favoriteUserIds.has(u._id))
       : nearbyUsersSorted
     : undefined
 
@@ -370,9 +420,7 @@ function NearbyPage() {
           variant="ghost"
           size="icon-sm"
           className="shrink-0 sm:hidden"
-          onClick={() =>
-            setViewMode(viewMode === 'grid' ? 'detailed' : 'grid')
-          }
+          onClick={() => setViewMode(viewMode === 'grid' ? 'detailed' : 'grid')}
           title={
             viewMode === 'grid'
               ? 'Switch to detailed view'
@@ -388,22 +436,67 @@ function NearbyPage() {
 
         {/* Daily Views Indicator for Free Users - only in explore (custom location) mode */}
         {!isUltra && dailyLimits && locationType === 'custom' && (
-          <div
-            className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-1 shrink-0 cursor-pointer hover:bg-amber-500/20 transition-colors"
-            onClick={() => checkoutUrl && (window.location.href = checkoutUrl)}
+          <Dialog
+            open={dailyViewsDialogOpen}
+            onOpenChange={setDailyViewsDialogOpen}
           >
-            <Eye className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-xs font-medium text-amber-600">
-              {dailyLimits.profileViews.remaining}/{dailyLimits.profileViews.limit}
-            </span>
-          </div>
+            <DialogTrigger className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-1 shrink-0 cursor-pointer hover:bg-amber-500/20 transition-colors">
+              <Eye className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-xs font-medium text-amber-600">
+                {dailyLimits.profileViews.remaining}/
+                {dailyLimits.profileViews.limit}
+              </span>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-amber-500" />
+                  Daily Profile Views
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <p className="text-sm text-muted-foreground">
+                  You have{' '}
+                  <span className="font-semibold text-foreground">
+                    {dailyLimits.profileViews.remaining}
+                  </span>{' '}
+                  of{' '}
+                  <span className="font-semibold text-foreground">
+                    {dailyLimits.profileViews.limit}
+                  </span>{' '}
+                  profile views remaining today.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Free users can view up to {FREE_DAILY_VIEW_LIMIT} profiles per
+                  day when exploring other locations.
+                </p>
+                <div className="pt-2 border-t">
+                  <Button
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-semibold"
+                    onClick={() => {
+                      if (checkoutUrl) {
+                        window.location.href = checkoutUrl
+                      }
+                    }}
+                  >
+                    <Zap className="w-4 h-4 mr-2" />
+                    Upgrade to Ultra for Unlimited Views
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
 
         {/* Separator */}
         <div className="w-px h-6 bg-border shrink-0" />
         <Button
           variant={
-            onlineOnly || withPhotos || ageFilter || interestFilter.length > 0 || favoritesOnly
+            onlineOnly ||
+            withPhotos ||
+            ageFilter ||
+            interestFilter.length > 0 ||
+            favoritesOnly
               ? 'default'
               : 'outline'
           }
@@ -419,7 +512,11 @@ function NearbyPage() {
         >
           <Filter className="w-4 h-4" />
           <span className="hidden sm:inline">
-            {onlineOnly || withPhotos || ageFilter || interestFilter.length > 0 || favoritesOnly
+            {onlineOnly ||
+            withPhotos ||
+            ageFilter ||
+            interestFilter.length > 0 ||
+            favoritesOnly
               ? 'Clear'
               : 'Filters'}
           </span>
@@ -459,20 +556,22 @@ function NearbyPage() {
 
         {/* Interest Filter Button */}
         <Dialog open={interestDialogOpen} onOpenChange={setInterestDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant={interestFilter.length > 0 ? 'default' : 'outline'}
-              size="sm"
-              className={`shrink-0 gap-1 ${interestFilter.length > 0 ? '' : 'border-border'}`}
-            >
-              <Tags className="w-4 h-4" />
-              <span className="hidden sm:inline">Interests</span>
-              {interestFilter.length > 0 && (
-                <span className="px-1.5 py-0.5 text-xs bg-white/20 rounded-full">
-                  {interestFilter.length}
-                </span>
-              )}
-            </Button>
+          <DialogTrigger
+            render={
+              <Button
+                variant={interestFilter.length > 0 ? 'default' : 'outline'}
+                size="sm"
+                className={`shrink-0 gap-1 ${interestFilter.length > 0 ? '' : 'border-border'}`}
+              />
+            }
+          >
+            <Tags className="w-4 h-4" />
+            <span className="hidden sm:inline">Interests</span>
+            {interestFilter.length > 0 && (
+              <span className="px-1.5 py-0.5 text-xs bg-white/20 rounded-full">
+                {interestFilter.length}
+              </span>
+            )}
           </DialogTrigger>
           <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
             <DialogHeader>
@@ -686,11 +785,13 @@ function NearbyPage() {
           <>
             {viewMode === 'grid' ? (
               /* Grid View */
-              (<div className="grid gap-1.5 sm:gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+              <div className="grid gap-1.5 sm:gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
                 {nearbyUsers.map((nearbyUser) => (
                   <div
                     key={nearbyUser._id}
-                    onClick={() => handleViewProfile(nearbyUser._id, nearbyUser.isSelf)}
+                    onClick={() =>
+                      handleViewProfile(nearbyUser._id, nearbyUser.isSelf)
+                    }
                     className="profile-card aspect-[3/4] rounded-lg overflow-hidden cursor-pointer group relative bg-card"
                   >
                     {getProfileImage(nearbyUser) ? (
@@ -814,14 +915,16 @@ function NearbyPage() {
                     </Button>
                   </div>
                 )}
-              </div>)
+              </div>
             ) : (
               /* Detailed View */
-              (<div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                 {nearbyUsers.map((nearbyUser) => (
                   <div
                     key={nearbyUser._id}
-                    onClick={() => handleViewProfile(nearbyUser._id, nearbyUser.isSelf)}
+                    onClick={() =>
+                      handleViewProfile(nearbyUser._id, nearbyUser.isSelf)
+                    }
                     className="bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:bg-card/80 transition-colors"
                   >
                     <div className="flex gap-4 p-4">
@@ -1015,7 +1118,7 @@ function NearbyPage() {
                     </Button>
                   </div>
                 )}
-              </div>)
+              </div>
             )}
 
             {/* Low Activity Content - shows when there are few users */}
@@ -1417,9 +1520,10 @@ function NearbyPage() {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <p className="text-muted-foreground">
-              You've viewed {FREE_DAILY_VIEW_LIMIT} profiles today while exploring. Free users
-              can view up to {FREE_DAILY_VIEW_LIMIT} profiles per day in explore mode. Switch to
-              nearby mode for unlimited local browsing!
+              You've viewed {FREE_DAILY_VIEW_LIMIT} profiles today while
+              exploring. Free users can view up to {FREE_DAILY_VIEW_LIMIT}{' '}
+              profiles per day in explore mode. Switch to nearby mode for
+              unlimited local browsing!
             </p>
             <div className="bg-gradient-to-br from-amber-500/20 via-primary/10 to-transparent rounded-xl p-4 text-center">
               <Sparkles className="w-10 h-10 text-amber-500 mx-auto mb-3" />

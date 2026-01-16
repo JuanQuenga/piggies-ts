@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { useQuery } from "convex/react"
 import { useNavigate } from "@tanstack/react-router"
 import { api } from "../../../convex/_generated/api"
@@ -44,6 +45,7 @@ function AlbumViewer({
 }: AlbumViewerProps) {
   const navigate = useNavigate()
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [mounted, setMounted] = useState(false)
 
   const albumData = useQuery(api.albums.viewUserAlbum, {
     viewerUserId,
@@ -51,7 +53,17 @@ function AlbumViewer({
     albumId,
   })
 
+  // Handle portal mounting and body scroll lock
+  useEffect(() => {
+    setMounted(true)
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = ""
+    }
+  }, [])
+
   const goToProfile = () => {
+    onClose()
     navigate({ to: "/user/$userId", params: { userId: ownerUserId } })
   }
 
@@ -73,142 +85,184 @@ function AlbumViewer({
     if (e.key === "Escape") onClose()
   }
 
-  if (albumData === undefined) {
-    return (
-      <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-white" />
-      </div>
-    )
-  }
+  // Don't render until mounted (for SSR safety)
+  if (!mounted) return null
 
-  if (!albumData || albumData.photos.length === 0) {
-    return (
-      <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-4 right-4 text-white hover:bg-white/20"
-          onClick={onClose}
-        >
-          <X className="w-6 h-6" />
-        </Button>
-        <ImageOff className="w-16 h-16 text-muted-foreground mb-4" />
-        <p className="text-white text-lg">This album is empty</p>
-      </div>
-    )
-  }
-
-  const currentPhoto = albumData.photos[currentIndex]
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/95 flex flex-col"
-      onKeyDown={handleKeyDown}
-      tabIndex={0}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-black/50">
-        <div className="flex items-center gap-3">
-          <Avatar className="w-10 h-10 border-2 border-white/20">
-            <AvatarImage src={ownerImageUrl} />
-            <AvatarFallback>{ownerName.charAt(0).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="text-white font-medium flex items-center gap-2">
-              <Lock className="w-4 h-4" />
-              {albumName}
-            </p>
-            <p className="text-white/60 text-sm">
-              {ownerName} - {currentIndex + 1} of {albumData.photos.length} photos
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-            onClick={goToProfile}
-          >
-            <User className="w-4 h-4 mr-2" />
-            View Profile
-          </Button>
+  const content = (() => {
+    if (albumData === undefined) {
+      return (
+        <div className="fixed inset-0 bg-black flex items-center justify-center" style={{ zIndex: 99999 }}>
           <Button
             variant="ghost"
             size="icon"
-            className="text-white hover:bg-white/20"
+            className="absolute top-4 right-4 text-white hover:bg-white/20"
             onClick={onClose}
           >
             <X className="w-6 h-6" />
           </Button>
+          <Loader2 className="w-8 h-8 animate-spin text-white" />
         </div>
-      </div>
+      )
+    }
 
-      {/* Photo viewer */}
-      <div className="flex-1 flex items-center justify-center relative p-4">
-        {/* Previous button */}
-        {currentIndex > 0 && (
+    if (!albumData || albumData.photos.length === 0) {
+      return (
+        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center p-4" style={{ zIndex: 99999 }}>
           <Button
             variant="ghost"
             size="icon"
-            className="absolute left-4 text-white hover:bg-white/20 w-12 h-12"
-            onClick={goToPrevious}
+            className="absolute top-4 right-4 text-white hover:bg-white/20"
+            onClick={onClose}
           >
-            <ChevronLeft className="w-8 h-8" />
+            <X className="w-6 h-6" />
           </Button>
-        )}
-
-        {/* Current photo */}
-        <img
-          src={currentPhoto.url ?? ""}
-          alt={currentPhoto.caption || `Photo ${currentIndex + 1}`}
-          className="max-w-full max-h-full object-contain rounded-lg"
-        />
-
-        {/* Next button */}
-        {currentIndex < albumData.photos.length - 1 && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-4 text-white hover:bg-white/20 w-12 h-12"
-            onClick={goToNext}
-          >
-            <ChevronRight className="w-8 h-8" />
-          </Button>
-        )}
-      </div>
-
-      {/* Caption if present */}
-      {currentPhoto.caption && (
-        <div className="p-4 bg-black/50 text-center">
-          <p className="text-white/80">{currentPhoto.caption}</p>
+          <ImageOff className="w-16 h-16 text-muted-foreground mb-4" />
+          <p className="text-white text-lg">This album is empty</p>
         </div>
-      )}
+      )
+    }
 
-      {/* Thumbnail strip */}
-      <div className="p-4 bg-black/50">
-        <div className="flex gap-2 justify-center overflow-x-auto max-w-full">
-          {albumData.photos.map((photo, index) => (
-            <button
-              key={photo._id}
-              onClick={() => setCurrentIndex(index)}
-              className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
-                index === currentIndex
-                  ? "border-primary scale-110"
-                  : "border-transparent opacity-60 hover:opacity-100"
-              }`}
+    const currentPhoto = albumData.photos[currentIndex]
+
+    return (
+      <div
+        className="fixed inset-0 bg-black flex flex-col"
+        style={{ zIndex: 99999 }}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 bg-black/80 safe-area-inset-top">
+          <div className="flex items-center gap-3">
+            <Avatar className="w-10 h-10 border-2 border-white/20">
+              <AvatarImage src={ownerImageUrl} />
+              <AvatarFallback>{ownerName.charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-white font-medium flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                {albumName}
+              </p>
+              <p className="text-white/60 text-sm">
+                {ownerName} - {currentIndex + 1} of {albumData.photos.length} photos
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden sm:flex bg-white/10 border-white/20 text-white hover:bg-white/20"
+              onClick={goToProfile}
             >
-              <img
-                src={photo.url ?? ""}
-                alt={`Thumbnail ${index + 1}`}
-                className="w-full h-full object-cover"
+              <User className="w-4 h-4 mr-2" />
+              View Profile
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20"
+              onClick={onClose}
+            >
+              <X className="w-6 h-6" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Photo viewer */}
+        <div className="flex-1 min-h-0 flex items-center justify-center relative overflow-hidden">
+          {/* Tap zones for mobile navigation */}
+          {albumData.photos.length > 1 && (
+            <>
+              <button
+                className="absolute left-0 top-0 w-1/4 h-full z-10 focus:outline-none"
+                onClick={goToPrevious}
+                disabled={currentIndex === 0}
+                aria-label="Previous photo"
               />
-            </button>
-          ))}
+              <button
+                className="absolute right-0 top-0 w-1/4 h-full z-10 focus:outline-none"
+                onClick={goToNext}
+                disabled={currentIndex === albumData.photos.length - 1}
+                aria-label="Next photo"
+              />
+            </>
+          )}
+
+          {/* Previous button - always visible when multiple photos */}
+          {albumData.photos.length > 1 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`absolute left-2 sm:left-4 text-white hover:bg-white/20 w-10 h-10 sm:w-12 sm:h-12 z-20 ${
+                currentIndex === 0 ? "opacity-30 cursor-not-allowed" : ""
+              }`}
+              onClick={goToPrevious}
+              disabled={currentIndex === 0}
+            >
+              <ChevronLeft className="w-6 h-6 sm:w-8 sm:h-8" />
+            </Button>
+          )}
+
+          {/* Current photo - properly constrained */}
+          <img
+            src={currentPhoto.url ?? ""}
+            alt={currentPhoto.caption || `Photo ${currentIndex + 1}`}
+            className="max-w-[calc(100%-5rem)] max-h-full object-contain rounded-lg select-none"
+            draggable={false}
+          />
+
+          {/* Next button - always visible when multiple photos */}
+          {albumData.photos.length > 1 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`absolute right-2 sm:right-4 text-white hover:bg-white/20 w-10 h-10 sm:w-12 sm:h-12 z-20 ${
+                currentIndex === albumData.photos.length - 1 ? "opacity-30 cursor-not-allowed" : ""
+              }`}
+              onClick={goToNext}
+              disabled={currentIndex === albumData.photos.length - 1}
+            >
+              <ChevronRight className="w-6 h-6 sm:w-8 sm:h-8" />
+            </Button>
+          )}
+        </div>
+
+        {/* Caption if present */}
+        {currentPhoto.caption && (
+          <div className="p-4 bg-black/50 text-center">
+            <p className="text-white/80">{currentPhoto.caption}</p>
+          </div>
+        )}
+
+        {/* Thumbnail strip */}
+        <div className="p-4 pb-6 bg-black/50 safe-area-inset-bottom">
+          <div className="flex gap-2 justify-center overflow-x-auto max-w-full">
+            {albumData.photos.map((photo, index) => (
+              <button
+                key={photo._id}
+                onClick={() => setCurrentIndex(index)}
+                className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                  index === currentIndex
+                    ? "border-primary scale-110"
+                    : "border-transparent opacity-60 hover:opacity-100"
+                }`}
+              >
+                <img
+                  src={photo.url ?? ""}
+                  alt={`Thumbnail ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  })()
+
+  // Render via portal to document.body to escape all stacking contexts
+  return createPortal(content, document.body)
 }
 
 export function UnlockedAlbumsTab({ userId }: UnlockedAlbumsTabProps) {
