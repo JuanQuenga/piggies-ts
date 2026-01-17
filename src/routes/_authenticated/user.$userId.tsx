@@ -16,7 +16,12 @@ import {
   Flag,
   MoreVertical,
   Check,
+  MapPin,
+  Clock,
+  Home,
+  Car,
 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { ProfileAlbumShareButton } from '@/components/albums/ProfileAlbumShareButton'
 import {
   DropdownMenu,
@@ -61,6 +66,11 @@ function UserProfilePage() {
     userId: userId as Id<'users'>,
   })
   const profilePhotos = useQuery(api.users.getProfilePhotos, {
+    userId: userId as Id<'users'>,
+  })
+
+  // Fetch user's Looking Now post
+  const lookingNowPost = useQuery(api.lookingNow.getMyActivePost, {
     userId: userId as Id<'users'>,
   })
 
@@ -174,7 +184,7 @@ function UserProfilePage() {
       })
       setShowBlockDialog(false)
       toast.success('User blocked successfully')
-      navigate({ to: '/nearby' })
+      navigate({ to: '/members' })
     } catch {
       toast.error('Failed to block user')
     }
@@ -198,6 +208,21 @@ function UserProfilePage() {
     }
   }
 
+  // Helper to format time remaining
+  const formatTimeRemaining = (expiresAt: number) => {
+    const now = Date.now()
+    const remaining = expiresAt - now
+    if (remaining <= 0) return 'Expired'
+
+    const hours = Math.floor(remaining / (1000 * 60 * 60))
+    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m left`
+    }
+    return `${minutes}m left`
+  }
+
   if (!user || !profile) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -216,7 +241,7 @@ function UserProfilePage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate({ to: '/nearby' })}
+            onClick={() => navigate({ to: '/members' })}
             className="gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -367,6 +392,49 @@ function UserProfilePage() {
               )}
             </h1>
           </div>
+
+          {/* Looking Now Banner */}
+          {lookingNowPost && (
+            <div className="bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border border-primary/30 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary to-primary/70 flex items-center justify-center shrink-0">
+                  <MapPin className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-primary text-sm">Looking Now</span>
+                    <Badge variant="outline" className="text-xs py-0 px-1.5">
+                      <Clock className="w-3 h-3 mr-1" />
+                      {formatTimeRemaining(lookingNowPost.expiresAt)}
+                    </Badge>
+                  </div>
+                  <p className="text-foreground">{lookingNowPost.message}</p>
+                  {(lookingNowPost.locationName || lookingNowPost.canHost !== undefined) && (
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {lookingNowPost.locationName && (
+                        <Badge variant="secondary" className="text-xs">
+                          <MapPin className="w-3 h-3 mr-1" />
+                          {lookingNowPost.locationName}
+                        </Badge>
+                      )}
+                      {lookingNowPost.canHost === true && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Home className="w-3 h-3 mr-1" />
+                          Can Host
+                        </Badge>
+                      )}
+                      {lookingNowPost.canHost === false && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Car className="w-3 h-3 mr-1" />
+                          Can Travel
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Looking For */}
           {profile.lookingFor && (

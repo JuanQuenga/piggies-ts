@@ -153,7 +153,7 @@ function AppealPage() {
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border">
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/nearby' })}>
+            <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/members' })}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex items-center gap-2">
@@ -177,7 +177,7 @@ function AppealPage() {
             <p className="text-muted-foreground mb-6">
               Your account is in good standing. There's nothing to appeal at this time.
             </p>
-            <Button onClick={() => navigate({ to: '/nearby' })}>Back to App</Button>
+            <Button onClick={() => navigate({ to: '/members' })}>Back to App</Button>
           </div>
         )}
 

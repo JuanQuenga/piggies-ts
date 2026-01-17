@@ -2,7 +2,7 @@ import { Link, useLocation } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { MessageCircle, MapPin, ImageIcon, Heart, Store } from 'lucide-react'
+import { MessageCircle, Users, Clock, Heart, Store } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface NavItem {
@@ -35,9 +35,9 @@ export function MobileBottomNav() {
       path: '/community',
     },
     {
-      icon: MapPin,
-      label: 'Nearby',
-      path: '/nearby',
+      icon: Users,
+      label: 'Members',
+      path: '/members',
     },
     {
       icon: Heart,
@@ -52,9 +52,9 @@ export function MobileBottomNav() {
       badge: unreadCount ?? 0,
     },
     {
-      icon: ImageIcon,
-      label: 'Photos',
-      path: '/photos',
+      icon: Clock,
+      label: 'Looking',
+      path: '/looking-now',
     },
   ]
 

@@ -36,6 +36,8 @@ import {
   Navigation,
   Loader2,
   Store,
+  Clock,
+  Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
@@ -255,17 +257,17 @@ export function AppHeader() {
   // Navigation items for desktop header
   const navItems = [
     { icon: Store, label: 'Community', path: '/community' },
-    { icon: MapPin, label: 'Nearby', path: '/nearby' },
+    { icon: Users, label: 'Members', path: '/members' },
     { icon: Heart, label: 'Interests', path: '/interests' },
     { icon: MessageCircle, label: 'Messages', path: '/messages', badge: unreadCount ?? 0 },
-    { icon: ImageIcon, label: 'Photos', path: '/photos' },
+    { icon: Clock, label: 'Looking Now', path: '/looking-now' },
   ]
 
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border">
       <div className="flex items-center justify-between h-14 px-4">
         {/* Logo */}
-        <Link to="/nearby" className="flex items-center gap-2">
+        <Link to="/members" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <img
               src="/pig-snout.svg"
@@ -444,10 +446,10 @@ export function AppHeader() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer"
-                onClick={() => navigate({ to: '/album' })}
+                onClick={() => navigate({ to: '/photos' })}
               >
                 <ImageIcon className="mr-2 w-4 h-4" />
-                Private Album
+                Photos
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer"

@@ -26,7 +26,7 @@ function AdminLayout() {
   // Redirect non-admins
   useEffect(() => {
     if (!isLoading && !isAdmin) {
-      navigate({ to: '/nearby' })
+      navigate({ to: '/members' })
     }
   }, [isAdmin, isLoading, navigate])
 
@@ -76,7 +76,7 @@ function AdminLayout() {
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border">
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/nearby' })}>
+            <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/members' })}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex items-center gap-2">

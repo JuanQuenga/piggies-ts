@@ -9,7 +9,7 @@ export const Route = createFileRoute('/')({
     
     // If authenticated, redirect to home feed
     if (user) {
-      throw redirect({ to: '/nearby' })
+      throw redirect({ to: '/members' })
     }
 
     const signInUrl = await getSignInUrl()

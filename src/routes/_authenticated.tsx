@@ -59,7 +59,7 @@ function AuthenticatedLayout() {
     if (needsOnboarding && !isOnboardingPage) {
       navigate({ to: '/onboarding' })
     } else if (!needsOnboarding && isOnboardingPage) {
-      navigate({ to: '/nearby' })
+      navigate({ to: '/members' })
     }
   }, [profile, convexUser, isLoading, location.pathname, navigate])
 
