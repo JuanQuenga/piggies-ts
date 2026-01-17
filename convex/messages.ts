@@ -423,7 +423,8 @@ export const getRecentConversations = query({
             v.literal("video"),
             v.literal("gif"),
             v.literal("location"),
-            v.literal("album_share")
+            v.literal("album_share"),
+            v.literal("snap")
           ),
           senderId: v.id("users"),
           sentAt: v.number(),
@@ -823,6 +824,217 @@ export const deleteUserSentMedia = mutation({
     await ctx.db.delete(args.messageId);
 
     return null;
+  },
+});
+
+// ============================================================================
+// SNAP (DISAPPEARING PHOTOS) FUNCTIONS
+// ============================================================================
+
+// Send a snap (disappearing photo)
+export const sendSnap = mutation({
+  args: {
+    conversationId: v.id("conversations"),
+    senderId: v.id("users"),
+    storageId: v.id("_storage"),
+    viewMode: v.union(v.literal("view_once"), v.literal("timed")),
+    duration: v.optional(v.number()), // seconds for timed mode (5, 10, 30)
+  },
+  returns: v.id("messages"),
+  handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.senderId);
+
+    // Verify conversation exists and user is a participant
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+
+    if (!conversation.participantIds.includes(args.senderId)) {
+      throw new Error("You are not a participant in this conversation");
+    }
+
+    // Validate timed mode has duration
+    if (args.viewMode === "timed" && !args.duration) {
+      throw new Error("Duration is required for timed snaps");
+    }
+
+    const sentAt = Date.now();
+
+    // Create snap message
+    const messageId = await ctx.db.insert("messages", {
+      conversationId: args.conversationId,
+      senderId: args.senderId,
+      content: "Snap",
+      format: "snap",
+      storageId: args.storageId,
+      sentAt,
+      snapViewMode: args.viewMode,
+      snapDuration: args.duration,
+      snapExpired: false,
+    });
+
+    // Update conversation
+    await ctx.db.patch(args.conversationId, {
+      lastMessageId: messageId,
+      lastMessageTime: sentAt,
+    });
+
+    // Find the recipient (other participant in the conversation)
+    const recipientUserId = conversation.participantIds.find(
+      (id) => id !== args.senderId
+    );
+
+    // Send push notification to recipient
+    if (recipientUserId) {
+      await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+        recipientUserId,
+        title: "New Snap",
+        body: "Sent you a disappearing photo",
+        tag: `snap-${args.conversationId}`,
+        data: {
+          type: "message" as const,
+          conversationId: args.conversationId,
+          senderId: args.senderId,
+          url: `/messages?conversation=${args.conversationId}`,
+        },
+      });
+    }
+
+    return messageId;
+  },
+});
+
+// Mark a snap as viewed (called when recipient opens snap)
+export const markSnapViewed = mutation({
+  args: {
+    messageId: v.id("messages"),
+    viewerId: v.id("users"),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageId);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+
+    // Verify it's a snap
+    if (message.format !== "snap") {
+      throw new Error("Not a snap message");
+    }
+
+    // Verify viewer is the recipient (not the sender)
+    if (message.senderId === args.viewerId) {
+      throw new Error("Cannot view your own snap");
+    }
+
+    // Verify viewer is in the conversation
+    const conversation = await ctx.db.get(message.conversationId);
+    if (!conversation || !conversation.participantIds.includes(args.viewerId)) {
+      throw new Error("You are not a participant in this conversation");
+    }
+
+    // Check if already viewed/expired
+    if (message.snapExpired) {
+      throw new Error("Snap has already been viewed");
+    }
+
+    // Mark as viewed
+    await ctx.db.patch(args.messageId, {
+      snapViewedAt: Date.now(),
+      snapExpired: true,
+    });
+
+    // Schedule storage deletion after 24 hours (buffer for any sync issues)
+    await ctx.scheduler.runAfter(
+      24 * 60 * 60 * 1000, // 24 hours
+      internal.messages.deleteSnapStorage,
+      { messageId: args.messageId }
+    );
+
+    return { success: true };
+  },
+});
+
+// Internal mutation to delete snap storage after expiration
+export const deleteSnapStorage = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+  },
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageId);
+    if (!message) return;
+
+    // Only delete if it's an expired snap with storage
+    if (message.format === "snap" && message.snapExpired && message.storageId) {
+      await ctx.storage.delete(message.storageId);
+      // Clear the storageId but keep the message record
+      await ctx.db.patch(args.messageId, {
+        storageId: undefined,
+      });
+    }
+  },
+});
+
+// Get snap URL (with access control)
+export const getSnapUrl = query({
+  args: {
+    messageId: v.id("messages"),
+    viewerId: v.id("users"),
+  },
+  returns: v.union(
+    v.object({
+      url: v.string(),
+      viewMode: v.union(v.literal("view_once"), v.literal("timed")),
+      duration: v.optional(v.number()),
+      isExpired: v.boolean(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageId);
+    if (!message) return null;
+
+    // Verify it's a snap
+    if (message.format !== "snap") return null;
+
+    // Verify viewer is in the conversation
+    const conversation = await ctx.db.get(message.conversationId);
+    if (!conversation || !conversation.participantIds.includes(args.viewerId)) {
+      return null;
+    }
+
+    // Check if expired (only for recipients, senders can always see status)
+    const isRecipient = message.senderId !== args.viewerId;
+    if (isRecipient && message.snapExpired) {
+      return {
+        url: "",
+        viewMode: message.snapViewMode || "view_once",
+        duration: message.snapDuration,
+        isExpired: true,
+      };
+    }
+
+    // Get storage URL
+    if (!message.storageId) {
+      return {
+        url: "",
+        viewMode: message.snapViewMode || "view_once",
+        duration: message.snapDuration,
+        isExpired: true,
+      };
+    }
+
+    const url = await ctx.storage.getUrl(message.storageId);
+    if (!url) return null;
+
+    return {
+      url,
+      viewMode: message.snapViewMode || "view_once",
+      duration: message.snapDuration,
+      isExpired: message.snapExpired || false,
+    };
   },
 });
 

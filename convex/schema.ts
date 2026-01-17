@@ -103,12 +103,21 @@ export default defineSchema({
       v.literal("video"),
       v.literal("gif"),
       v.literal("location"),
-      v.literal("album_share")
+      v.literal("album_share"),
+      v.literal("snap")
     ),
     storageId: v.optional(v.id("_storage")),
     sentAt: v.number(),
     // Read receipts - maps user ID to timestamp when they read the message
     readAt: v.optional(v.record(v.id("users"), v.number())),
+    // Snap-specific fields (for disappearing photos)
+    snapViewMode: v.optional(v.union(
+      v.literal("view_once"),
+      v.literal("timed")
+    )),
+    snapDuration: v.optional(v.number()),     // seconds (5, 10, 30) for timed mode
+    snapViewedAt: v.optional(v.number()),     // timestamp when recipient opened
+    snapExpired: v.optional(v.boolean()),     // true after viewed/expired
     // Moderation fields
     isHidden: v.optional(v.boolean()),       // Message hidden by admin
     hiddenAt: v.optional(v.number()),        // When message was hidden

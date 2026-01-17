@@ -33,6 +33,7 @@ import {
   CheckCheck,
   Paperclip,
   ImagePlus,
+  Camera,
 } from "lucide-react"
 import { useState, useRef, useEffect, useLayoutEffect } from "react"
 import { cn } from "@/lib/utils"
@@ -42,6 +43,9 @@ import { MediaUpload } from "./MediaUpload"
 import { AlbumShareButton } from "../albums/AlbumShareButton"
 import { AlbumViewButton } from "../albums/AlbumViewButton"
 import { AlbumShareMessage } from "./AlbumShareMessage"
+import { CameraCapture } from "./CameraCapture"
+import { SnapViewer } from "./SnapViewer"
+import { SnapMessage } from "./SnapMessage"
 import { useSubscription } from "@/hooks/useSubscription"
 import { toast } from "sonner"
 
@@ -63,6 +67,9 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
   const [reportReason, setReportReason] = useState("")
   const [reportDetails, setReportDetails] = useState("")
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
+  const [showCameraCapture, setShowCameraCapture] = useState(false)
+  const [viewingSnapId, setViewingSnapId] = useState<Id<"messages"> | null>(null)
+  const [isUploadingSnap, setIsUploadingSnap] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -104,6 +111,8 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
   const blockUser = useMutation(api.users.blockUser)
   const reportUser = useMutation(api.users.reportUser)
   const reportMessage = useMutation(api.messages.reportMessage)
+  const sendSnap = useMutation(api.messages.sendSnap)
+  const generateUploadUrl = useMutation(api.messages.generateUploadUrl)
 
   // Mark messages as read when viewing
   useEffect(() => {
@@ -237,6 +246,39 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
     } finally {
       setIsSending(false)
       inputRef.current?.focus()
+    }
+  }
+
+  const handleSendSnap = async (blob: Blob, viewMode: "view_once" | "timed", duration?: number) => {
+    setIsUploadingSnap(true)
+    try {
+      // Upload the image to Convex storage
+      const uploadUrl = await generateUploadUrl()
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": "image/jpeg" },
+        body: blob,
+      })
+
+      if (!response.ok) throw new Error("Upload failed")
+
+      const { storageId } = await response.json()
+
+      // Send the snap
+      await sendSnap({
+        conversationId,
+        senderId: currentUserId,
+        storageId,
+        viewMode,
+        duration,
+      })
+
+      setShowCameraCapture(false)
+      toast.success("Snap sent!")
+    } catch {
+      toast.error("Failed to send snap")
+    } finally {
+      setIsUploadingSnap(false)
     }
   }
 
@@ -590,7 +632,7 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
                                       : "px-4 py-2 rounded-2xl bg-card border border-border rounded-bl-md"
                                 )}
                               >
-                                <MessageContent message={message} isOwn={isOwn} currentUserId={currentUserId} />
+                                <MessageContent message={message} isOwn={isOwn} currentUserId={currentUserId} onSnapClick={setViewingSnapId} />
                                 {showTime && (
                                   <div className={cn(
                                     "flex items-center gap-1 text-[10px] mt-1",
@@ -625,7 +667,7 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
                                   : "px-4 py-2 rounded-2xl bg-primary text-primary-foreground rounded-br-md"
                             )}
                           >
-                            <MessageContent message={message} isOwn={isOwn} currentUserId={currentUserId} />
+                            <MessageContent message={message} isOwn={isOwn} currentUserId={currentUserId} onSnapClick={setViewingSnapId} />
                             {(showTime || (isUltra && otherUserId && message.readAt?.[otherUserId])) && (
                               <div className={cn(
                                 "flex items-center gap-1 text-[10px] mt-1",
@@ -698,10 +740,21 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
                 type="button"
                 onClick={() => {
                   setShowAttachMenu(false)
+                  setShowCameraCapture(true)
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors"
+              >
+                <Camera className="w-5 h-5 text-primary" />
+                <span>Snap</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAttachMenu(false)
                   // Trigger MediaUpload's picker
                   document.getElementById('mobile-media-upload')?.click()
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted transition-colors border-t border-border"
               >
                 <ImagePlus className="w-5 h-5 text-muted-foreground" />
                 <span>Photo/Video</span>
@@ -731,6 +784,18 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
             hideTrigger
           />
         </div>
+
+        {/* Desktop: Camera/Snap button */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowCameraCapture(true)}
+          className="shrink-0 text-muted-foreground hover:text-primary hidden lg:flex"
+          title="Send a disappearing photo"
+        >
+          <Camera className="w-5 h-5" />
+        </Button>
 
         {/* Desktop: Separate Media Upload button */}
         <div className="hidden lg:block">
@@ -897,6 +962,24 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
         </DialogContent>
       </Dialog>
 
+      {/* Camera Capture for Snaps */}
+      {showCameraCapture && (
+        <CameraCapture
+          onCapture={handleSendSnap}
+          onClose={() => setShowCameraCapture(false)}
+          isUploading={isUploadingSnap}
+        />
+      )}
+
+      {/* Snap Viewer */}
+      {viewingSnapId && (
+        <SnapViewer
+          messageId={viewingSnapId}
+          viewerId={currentUserId}
+          onClose={() => setViewingSnapId(null)}
+        />
+      )}
+
     </div>
   )
 }
@@ -906,16 +989,23 @@ function MessageContent({
   message,
   isOwn,
   currentUserId,
+  onSnapClick,
 }: {
   message: {
+    _id: Id<"messages">
     content: string
     format: string
     storageId?: Id<"_storage">
     senderId: Id<"users">
     sender: { name: string }
+    snapViewMode?: "view_once" | "timed"
+    snapDuration?: number
+    snapExpired?: boolean
+    snapViewedAt?: number
   }
   isOwn: boolean
   currentUserId: Id<"users">
+  onSnapClick?: (messageId: Id<"messages">) => void
 }) {
   // For media messages with storage ID, we'd fetch the URL
   // For now, we'll handle the formats we have
@@ -982,6 +1072,20 @@ function MessageContent({
           senderId={message.senderId}
           currentUserId={currentUserId}
           senderName={message.sender.name}
+        />
+      )
+
+    case "snap":
+      return (
+        <SnapMessage
+          messageId={message._id}
+          viewerId={currentUserId}
+          isOwn={isOwn}
+          snapViewMode={message.snapViewMode}
+          snapDuration={message.snapDuration}
+          snapExpired={message.snapExpired}
+          snapViewedAt={message.snapViewedAt}
+          onClick={() => onSnapClick?.(message._id)}
         />
       )
 
