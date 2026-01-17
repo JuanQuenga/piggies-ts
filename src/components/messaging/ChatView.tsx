@@ -577,11 +577,12 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
 
                         {/* Message bubble with context menu for other's messages */}
                         {!isOwn ? (
+                          <div className="max-w-[70%]">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <div
                                 className={cn(
-                                  "max-w-[70%] cursor-pointer text-left",
+                                  "cursor-pointer text-left",
                                   message.format === "gif" || message.format === "image" || message.format === "video"
                                     ? "rounded-xl overflow-hidden"
                                     : message.format === "album_share"
@@ -612,6 +613,7 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
+                          </div>
                         ) : (
                           <div
                             className={cn(
@@ -624,7 +626,7 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
                             )}
                           >
                             <MessageContent message={message} isOwn={isOwn} currentUserId={currentUserId} />
-                            {showTime && (
+                            {(showTime || (isUltra && otherUserId && message.readAt?.[otherUserId])) && (
                               <div className={cn(
                                 "flex items-center gap-1 text-[10px] mt-1",
                                 message.format === "gif" || message.format === "image" || message.format === "video"
@@ -717,16 +719,17 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
               </button>
             </div>
           )}
+        </div>
 
-          {/* Hidden MediaUpload trigger for mobile */}
-          <div className="hidden">
-            <MediaUpload
-              conversationId={conversationId}
-              senderId={currentUserId}
-              isUltra={isUltra}
-              triggerId="mobile-media-upload"
-            />
-          </div>
+        {/* Mobile MediaUpload - modal uses fixed positioning */}
+        <div className="lg:hidden">
+          <MediaUpload
+            conversationId={conversationId}
+            senderId={currentUserId}
+            isUltra={isUltra}
+            triggerId="mobile-media-upload"
+            hideTrigger
+          />
         </div>
 
         {/* Desktop: Separate Media Upload button */}
@@ -920,7 +923,7 @@ function MessageContent({
   switch (message.format) {
     case "text":
       return (
-        <p className="text-sm whitespace-pre-wrap break-words">
+        <p className="text-sm whitespace-pre-wrap break-words [word-break:break-word]">
           {message.content}
         </p>
       )

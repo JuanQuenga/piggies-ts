@@ -19,6 +19,7 @@ interface MediaUploadProps {
   onSuccess?: () => void
   onError?: (error: string) => void
   triggerId?: string
+  hideTrigger?: boolean
 }
 
 type MediaType = "image" | "video"
@@ -38,6 +39,7 @@ export function MediaUpload({
   onSuccess,
   onError,
   triggerId,
+  hideTrigger = false,
 }: MediaUploadProps) {
   const [showPicker, setShowPicker] = useState(false)
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia | null>(null)
@@ -185,25 +187,37 @@ export function MediaUpload({
       />
 
       {/* Trigger button */}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={handleOpenMediaPicker}
-        className="shrink-0 text-muted-foreground hover:text-primary"
-        disabled={isUploading}
-        id={triggerId}
-      >
-        {isUploading ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
-        ) : (
-          <ImagePlus className="w-5 h-5" />
-        )}
-      </Button>
+      {!hideTrigger && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={handleOpenMediaPicker}
+          className="shrink-0 text-muted-foreground hover:text-primary"
+          disabled={isUploading}
+          id={triggerId}
+        >
+          {isUploading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <ImagePlus className="w-5 h-5" />
+          )}
+        </Button>
+      )}
+      {/* Hidden button for programmatic triggering when hideTrigger is true */}
+      {hideTrigger && (
+        <button
+          type="button"
+          onClick={handleOpenMediaPicker}
+          id={triggerId}
+          className="hidden"
+          aria-hidden="true"
+        />
+      )}
 
       {/* Media picker modal */}
       {showPicker && !selectedMedia && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 mx-4 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50">
+        <div className="fixed bottom-32 left-4 right-4 lg:absolute lg:bottom-full lg:left-0 lg:right-0 lg:mb-2 lg:mx-4 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50">
           {/* Tabs */}
           <div className="flex border-b border-border">
             <button
@@ -265,15 +279,15 @@ export function MediaUpload({
                     <p className="text-sm text-muted-foreground">No recent media</p>
                   </div>
                 ) : (
-                  <ScrollArea className="h-48">
-                    <div className="grid grid-cols-3 gap-2">
+                  <ScrollArea className="h-32">
+                    <div className="grid grid-cols-4 gap-1.5">
                       {previousMedia.map((media) => (
                         <button
                           key={media._id}
                           type="button"
                           onClick={() => handleSendPreviousMedia(media.storageId, media.format)}
                           disabled={isUploading}
-                          className="relative aspect-square rounded-lg overflow-hidden bg-muted hover:opacity-80 transition-opacity disabled:opacity-50"
+                          className="relative aspect-square rounded-md overflow-hidden bg-muted hover:opacity-80 transition-opacity disabled:opacity-50 w-16 h-16"
                         >
                           {media.format === "image" ? (
                             <img
@@ -283,12 +297,12 @@ export function MediaUpload({
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <FileVideo className="w-8 h-8 text-muted-foreground" />
+                              <FileVideo className="w-5 h-5 text-muted-foreground" />
                             </div>
                           )}
                           {media.format === "video" && (
-                            <div className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1 rounded">
-                              <FileVideo className="w-3 h-3" />
+                            <div className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[8px] px-0.5 rounded">
+                              <FileVideo className="w-2.5 h-2.5" />
                             </div>
                           )}
                         </button>
@@ -325,7 +339,7 @@ export function MediaUpload({
 
       {/* Preview modal for new uploads */}
       {showPicker && selectedMedia && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 mx-4 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50">
+        <div className="fixed bottom-32 left-4 right-4 lg:absolute lg:bottom-full lg:left-0 lg:right-0 lg:mb-2 lg:mx-4 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50">
           {/* Preview */}
           <div className="relative p-4">
             <Button
