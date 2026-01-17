@@ -8,6 +8,9 @@ import {
   ArrowLeft,
   Shield,
   Store,
+  MessageSquare,
+  Gavel,
+  Scale,
 } from 'lucide-react'
 import { useEffect } from 'react'
 
@@ -46,9 +49,12 @@ function AdminLayout() {
 
   const navItems = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/admin/reports', icon: Flag, label: 'Reports' },
+    { to: '/admin/reports', icon: Flag, label: 'User Reports' },
+    { to: '/admin/message-reports', icon: MessageSquare, label: 'Message Reports' },
+    { to: '/admin/appeals', icon: Scale, label: 'Appeals' },
     { to: '/admin/users', icon: Users, label: 'Users' },
     { to: '/admin/venues', icon: Store, label: 'Venues' },
+    { to: '/admin/rules', icon: Gavel, label: 'Rules' },
   ]
 
   const isActive = (path: string) => {

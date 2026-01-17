@@ -3,6 +3,7 @@ import { query, mutation, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { paginationOptsValidator } from "convex/server";
 import { Id } from "./_generated/dataModel";
+import { requireNotModerated } from "./lib/moderationCheck";
 
 // Internal: Get or create a conversation between two users
 export const getOrCreateConversation = internalMutation({
@@ -115,6 +116,9 @@ export const sendMessage = mutation({
   },
   returns: v.id("messages"),
   handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.senderId);
+
     if (args.senderId === args.receiverId) {
       throw new Error("Cannot send a message to yourself.");
     }
@@ -191,6 +195,9 @@ export const sendMessageToConversation = mutation({
   },
   returns: v.id("messages"),
   handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.senderId);
+
     // Verify conversation exists and user is a participant
     const conversation = await ctx.db.get(args.conversationId);
     if (!conversation) {
@@ -268,24 +275,26 @@ export const listMessages = query({
       .order("desc")
       .paginate(args.paginationOpts);
 
-    // Enrich messages with sender info
+    // Filter out hidden messages and enrich with sender info
     const messagesWithSenders = await Promise.all(
-      result.page.map(async (message) => {
-        const sender = await ctx.db.get(message.senderId);
-        const senderProfile = await ctx.db
-          .query("profiles")
-          .withIndex("by_userId", (q) => q.eq("userId", message.senderId))
-          .unique();
+      result.page
+        .filter((message) => !message.isHidden) // Filter hidden messages
+        .map(async (message) => {
+          const sender = await ctx.db.get(message.senderId);
+          const senderProfile = await ctx.db
+            .query("profiles")
+            .withIndex("by_userId", (q) => q.eq("userId", message.senderId))
+            .unique();
 
-        return {
-          ...message,
-          sender: {
-            _id: message.senderId,
-            name: senderProfile?.displayName ?? sender?.name ?? "Unknown",
-            imageUrl: sender?.imageUrl,
-          },
-        };
-      })
+          return {
+            ...message,
+            sender: {
+              _id: message.senderId,
+              name: senderProfile?.displayName ?? sender?.name ?? "Unknown",
+              imageUrl: sender?.imageUrl,
+            },
+          };
+        })
     );
 
     return {
@@ -814,6 +823,58 @@ export const deleteUserSentMedia = mutation({
     await ctx.db.delete(args.messageId);
 
     return null;
+  },
+});
+
+// ============================================================================
+// MESSAGE REPORTING
+// ============================================================================
+
+// Report a message
+export const reportMessage = mutation({
+  args: {
+    reporterId: v.id("users"),
+    messageId: v.id("messages"),
+    reason: v.string(),
+    details: v.optional(v.string()),
+  },
+  returns: v.object({ success: v.boolean(), reportId: v.id("reportedMessages") }),
+  handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.reporterId);
+
+    const message = await ctx.db.get(args.messageId);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+
+    if (message.senderId === args.reporterId) {
+      throw new Error("Cannot report your own message");
+    }
+
+    // Check if already reported by this user
+    const existingReport = await ctx.db
+      .query("reportedMessages")
+      .withIndex("by_messageId", (q) => q.eq("messageId", args.messageId))
+      .filter((q) => q.eq(q.field("reporterId"), args.reporterId))
+      .first();
+
+    if (existingReport) {
+      throw new Error("You have already reported this message");
+    }
+
+    const reportId = await ctx.db.insert("reportedMessages", {
+      reporterId: args.reporterId,
+      messageId: args.messageId,
+      conversationId: message.conversationId,
+      messageSenderId: message.senderId,
+      reason: args.reason,
+      details: args.details,
+      reportedAt: Date.now(),
+      status: "pending",
+    });
+
+    return { success: true, reportId };
   },
 });
 

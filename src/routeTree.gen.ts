@@ -29,6 +29,7 @@ import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedLookingNowRouteImport } from './routes/_authenticated/looking-now'
 import { Route as AuthenticatedInterestsRouteImport } from './routes/_authenticated/interests'
 import { Route as AuthenticatedCommunityRouteImport } from './routes/_authenticated/community'
+import { Route as AuthenticatedAppealRouteImport } from './routes/_authenticated/appeal'
 import { Route as AuthenticatedAlbumRouteImport } from './routes/_authenticated/album'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
@@ -37,7 +38,10 @@ import { Route as ApiAuthCallbackRouteImport } from './routes/api/auth/callback'
 import { Route as AuthenticatedUserUserIdRouteImport } from './routes/_authenticated/user.$userId'
 import { Route as AuthenticatedAdminVenuesRouteImport } from './routes/_authenticated/admin/venues'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
+import { Route as AuthenticatedAdminRulesRouteImport } from './routes/_authenticated/admin/rules'
 import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin/reports'
+import { Route as AuthenticatedAdminMessageReportsRouteImport } from './routes/_authenticated/admin/message-reports'
+import { Route as AuthenticatedAdminAppealsRouteImport } from './routes/_authenticated/admin/appeals'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -139,6 +143,11 @@ const AuthenticatedCommunityRoute = AuthenticatedCommunityRouteImport.update({
   path: '/community',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAppealRoute = AuthenticatedAppealRouteImport.update({
+  id: '/appeal',
+  path: '/appeal',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAlbumRoute = AuthenticatedAlbumRouteImport.update({
   id: '/album',
   path: '/album',
@@ -180,10 +189,27 @@ const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminRulesRoute = AuthenticatedAdminRulesRouteImport.update({
+  id: '/rules',
+  path: '/rules',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminReportsRoute =
   AuthenticatedAdminReportsRouteImport.update({
     id: '/reports',
     path: '/reports',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminMessageReportsRoute =
+  AuthenticatedAdminMessageReportsRouteImport.update({
+    id: '/message-reports',
+    path: '/message-reports',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminAppealsRoute =
+  AuthenticatedAdminAppealsRouteImport.update({
+    id: '/appeals',
+    path: '/appeals',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 
@@ -195,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/album': typeof AuthenticatedAlbumRoute
+  '/appeal': typeof AuthenticatedAppealRoute
   '/community': typeof AuthenticatedCommunityRoute
   '/interests': typeof AuthenticatedInterestsRoute
   '/looking-now': typeof AuthenticatedLookingNowRoute
@@ -209,7 +236,10 @@ export interface FileRoutesByFullPath {
   '/who-viewed-me': typeof AuthenticatedWhoViewedMeRoute
   '/api/checkout': typeof ApiCheckoutRoute
   '/api/portal': typeof ApiPortalRoute
+  '/admin/appeals': typeof AuthenticatedAdminAppealsRoute
+  '/admin/message-reports': typeof AuthenticatedAdminMessageReportsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
+  '/admin/rules': typeof AuthenticatedAdminRulesRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/venues': typeof AuthenticatedAdminVenuesRoute
   '/user/$userId': typeof AuthenticatedUserUserIdRoute
@@ -224,6 +254,7 @@ export interface FileRoutesByTo {
   '/legal': typeof LegalRoute
   '/login': typeof LoginRoute
   '/album': typeof AuthenticatedAlbumRoute
+  '/appeal': typeof AuthenticatedAppealRoute
   '/community': typeof AuthenticatedCommunityRoute
   '/interests': typeof AuthenticatedInterestsRoute
   '/looking-now': typeof AuthenticatedLookingNowRoute
@@ -238,7 +269,10 @@ export interface FileRoutesByTo {
   '/who-viewed-me': typeof AuthenticatedWhoViewedMeRoute
   '/api/checkout': typeof ApiCheckoutRoute
   '/api/portal': typeof ApiPortalRoute
+  '/admin/appeals': typeof AuthenticatedAdminAppealsRoute
+  '/admin/message-reports': typeof AuthenticatedAdminMessageReportsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
+  '/admin/rules': typeof AuthenticatedAdminRulesRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/venues': typeof AuthenticatedAdminVenuesRoute
   '/user/$userId': typeof AuthenticatedUserUserIdRoute
@@ -256,6 +290,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/album': typeof AuthenticatedAlbumRoute
+  '/_authenticated/appeal': typeof AuthenticatedAppealRoute
   '/_authenticated/community': typeof AuthenticatedCommunityRoute
   '/_authenticated/interests': typeof AuthenticatedInterestsRoute
   '/_authenticated/looking-now': typeof AuthenticatedLookingNowRoute
@@ -270,7 +305,10 @@ export interface FileRoutesById {
   '/_authenticated/who-viewed-me': typeof AuthenticatedWhoViewedMeRoute
   '/api/checkout': typeof ApiCheckoutRoute
   '/api/portal': typeof ApiPortalRoute
+  '/_authenticated/admin/appeals': typeof AuthenticatedAdminAppealsRoute
+  '/_authenticated/admin/message-reports': typeof AuthenticatedAdminMessageReportsRoute
   '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
+  '/_authenticated/admin/rules': typeof AuthenticatedAdminRulesRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/venues': typeof AuthenticatedAdminVenuesRoute
   '/_authenticated/user/$userId': typeof AuthenticatedUserUserIdRoute
@@ -288,6 +326,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin'
     | '/album'
+    | '/appeal'
     | '/community'
     | '/interests'
     | '/looking-now'
@@ -302,7 +341,10 @@ export interface FileRouteTypes {
     | '/who-viewed-me'
     | '/api/checkout'
     | '/api/portal'
+    | '/admin/appeals'
+    | '/admin/message-reports'
     | '/admin/reports'
+    | '/admin/rules'
     | '/admin/users'
     | '/admin/venues'
     | '/user/$userId'
@@ -317,6 +359,7 @@ export interface FileRouteTypes {
     | '/legal'
     | '/login'
     | '/album'
+    | '/appeal'
     | '/community'
     | '/interests'
     | '/looking-now'
@@ -331,7 +374,10 @@ export interface FileRouteTypes {
     | '/who-viewed-me'
     | '/api/checkout'
     | '/api/portal'
+    | '/admin/appeals'
+    | '/admin/message-reports'
     | '/admin/reports'
+    | '/admin/rules'
     | '/admin/users'
     | '/admin/venues'
     | '/user/$userId'
@@ -348,6 +394,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/admin'
     | '/_authenticated/album'
+    | '/_authenticated/appeal'
     | '/_authenticated/community'
     | '/_authenticated/interests'
     | '/_authenticated/looking-now'
@@ -362,7 +409,10 @@ export interface FileRouteTypes {
     | '/_authenticated/who-viewed-me'
     | '/api/checkout'
     | '/api/portal'
+    | '/_authenticated/admin/appeals'
+    | '/_authenticated/admin/message-reports'
     | '/_authenticated/admin/reports'
+    | '/_authenticated/admin/rules'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/venues'
     | '/_authenticated/user/$userId'
@@ -526,6 +576,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCommunityRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/appeal': {
+      id: '/_authenticated/appeal'
+      path: '/appeal'
+      fullPath: '/appeal'
+      preLoaderRoute: typeof AuthenticatedAppealRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/album': {
       id: '/_authenticated/album'
       path: '/album'
@@ -582,6 +639,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/rules': {
+      id: '/_authenticated/admin/rules'
+      path: '/rules'
+      fullPath: '/admin/rules'
+      preLoaderRoute: typeof AuthenticatedAdminRulesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/reports': {
       id: '/_authenticated/admin/reports'
       path: '/reports'
@@ -589,18 +653,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminReportsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/message-reports': {
+      id: '/_authenticated/admin/message-reports'
+      path: '/message-reports'
+      fullPath: '/admin/message-reports'
+      preLoaderRoute: typeof AuthenticatedAdminMessageReportsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/appeals': {
+      id: '/_authenticated/admin/appeals'
+      path: '/appeals'
+      fullPath: '/admin/appeals'
+      preLoaderRoute: typeof AuthenticatedAdminAppealsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAppealsRoute: typeof AuthenticatedAdminAppealsRoute
+  AuthenticatedAdminMessageReportsRoute: typeof AuthenticatedAdminMessageReportsRoute
   AuthenticatedAdminReportsRoute: typeof AuthenticatedAdminReportsRoute
+  AuthenticatedAdminRulesRoute: typeof AuthenticatedAdminRulesRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminVenuesRoute: typeof AuthenticatedAdminVenuesRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAppealsRoute: AuthenticatedAdminAppealsRoute,
+  AuthenticatedAdminMessageReportsRoute: AuthenticatedAdminMessageReportsRoute,
   AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
+  AuthenticatedAdminRulesRoute: AuthenticatedAdminRulesRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminVenuesRoute: AuthenticatedAdminVenuesRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
@@ -612,6 +696,7 @@ const AuthenticatedAdminRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedAlbumRoute: typeof AuthenticatedAlbumRoute
+  AuthenticatedAppealRoute: typeof AuthenticatedAppealRoute
   AuthenticatedCommunityRoute: typeof AuthenticatedCommunityRoute
   AuthenticatedInterestsRoute: typeof AuthenticatedInterestsRoute
   AuthenticatedLookingNowRoute: typeof AuthenticatedLookingNowRoute
@@ -630,6 +715,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedAlbumRoute: AuthenticatedAlbumRoute,
+  AuthenticatedAppealRoute: AuthenticatedAppealRoute,
   AuthenticatedCommunityRoute: AuthenticatedCommunityRoute,
   AuthenticatedInterestsRoute: AuthenticatedInterestsRoute,
   AuthenticatedLookingNowRoute: AuthenticatedLookingNowRoute,

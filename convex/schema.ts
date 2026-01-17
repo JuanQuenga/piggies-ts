@@ -109,12 +109,132 @@ export default defineSchema({
     sentAt: v.number(),
     // Read receipts - maps user ID to timestamp when they read the message
     readAt: v.optional(v.record(v.id("users"), v.number())),
+    // Moderation fields
+    isHidden: v.optional(v.boolean()),       // Message hidden by admin
+    hiddenAt: v.optional(v.number()),        // When message was hidden
+    hiddenBy: v.optional(v.id("users")),     // Admin who hid it
+    hiddenReason: v.optional(v.string()),    // Reason for hiding
   })
     .index("by_conversation", ["conversationId"])
     .index("by_sentAt", ["conversationId", "sentAt"])
     .searchIndex("search_content", {
       searchField: "content",
     }),
+
+  // ============================================================================
+  // REPORTED MESSAGES TABLE
+  // ============================================================================
+  reportedMessages: defineTable({
+    reporterId: v.id("users"),
+    messageId: v.id("messages"),
+    conversationId: v.id("conversations"),
+    messageSenderId: v.id("users"),          // Cached for easier querying
+    reason: v.string(),
+    details: v.optional(v.string()),
+    reportedAt: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("reviewed"),
+      v.literal("resolved"),
+      v.literal("dismissed")
+    ),
+    // Admin review fields
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    adminNotes: v.optional(v.string()),
+    actionTaken: v.optional(v.union(
+      v.literal("none"),
+      v.literal("message_hidden"),
+      v.literal("user_warning"),
+      v.literal("user_suspension"),
+      v.literal("user_ban")
+    )),
+  })
+    .index("by_status", ["status"])
+    .index("by_messageId", ["messageId"])
+    .index("by_reporter", ["reporterId"])
+    .index("by_messageSender", ["messageSenderId"])
+    .index("by_reportedAt", ["reportedAt"]),
+
+  // ============================================================================
+  // MODERATION NOTIFICATIONS TABLE
+  // ============================================================================
+  moderationNotifications: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("warning"),
+      v.literal("suspension"),
+      v.literal("ban"),
+      v.literal("appeal_accepted"),
+      v.literal("appeal_rejected")
+    ),
+    reason: v.optional(v.string()),
+    suspendedUntil: v.optional(v.number()),      // For suspensions
+    warningNumber: v.optional(v.number()),        // e.g., "Warning 2 of 3"
+    createdAt: v.number(),
+    readAt: v.optional(v.number()),              // When user acknowledged
+    appealId: v.optional(v.id("appeals")),       // Link to appeal if relevant
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_readAt", ["userId", "readAt"])
+    .index("by_createdAt", ["createdAt"]),
+
+  // ============================================================================
+  // MODERATION RULES TABLE (for auto-escalation)
+  // ============================================================================
+  moderationRules: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    enabled: v.boolean(),
+    triggerType: v.union(
+      v.literal("warning_count"),    // Triggered when user reaches X warnings
+      v.literal("report_count")      // Triggered when user receives X reports
+    ),
+    threshold: v.number(),           // Number that triggers the rule
+    action: v.union(
+      v.literal("warning"),
+      v.literal("suspension"),
+      v.literal("ban")
+    ),
+    suspensionDays: v.optional(v.number()),  // For suspension actions
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_enabled", ["enabled"])
+    .index("by_triggerType", ["triggerType"]),
+
+  // ============================================================================
+  // APPEALS TABLE
+  // ============================================================================
+  appeals: defineTable({
+    userId: v.id("users"),
+    appealType: v.union(
+      v.literal("ban"),
+      v.literal("suspension"),
+      v.literal("warning")
+    ),
+    reason: v.string(),                          // User's appeal reason
+    additionalInfo: v.optional(v.string()),      // Additional context
+    submittedAt: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("under_review"),
+      v.literal("accepted"),
+      v.literal("rejected")
+    ),
+    // Admin review fields
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    adminResponse: v.optional(v.string()),       // Admin's response to user
+    // Context at time of appeal
+    originalBannedReason: v.optional(v.string()),
+    originalSuspendedUntil: v.optional(v.number()),
+    originalWarningCount: v.optional(v.number()),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_submittedAt", ["submittedAt"])
+    .index("by_userId_status", ["userId", "status"]),
 
   // ============================================================================
   // BLOCKED USERS TABLE

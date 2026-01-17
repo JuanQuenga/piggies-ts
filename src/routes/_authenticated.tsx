@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect, useNavigate, useLocation } from '@tanstack/react-router'
+import { createFileRoute, Outlet, redirect, useNavigate, useLocation, Link } from '@tanstack/react-router'
 import { getAuth, getSignInUrl, signOut } from '@workos/authkit-tanstack-react-start'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
@@ -7,7 +7,8 @@ import { useLocationTracking } from '@/hooks/useLocationTracking'
 import { useEffect, useState } from 'react'
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav'
 import { AppHeader } from '@/components/navigation/AppHeader'
-import { Ban, Clock, AlertTriangle, MapPin, Navigation, Loader2 } from 'lucide-react'
+import { ModerationNotice } from '@/components/moderation/ModerationNotice'
+import { Ban, Clock, AlertTriangle, MapPin, Navigation, Loader2, Scale } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import type { Id } from '../../convex/_generated/dataModel'
@@ -99,6 +100,8 @@ function AuthenticatedLayout() {
   return (
     <>
       {!hideHeader && <AppHeader />}
+      {/* Show moderation notices for warnings (bans/suspensions handled above) */}
+      {convexUser && <ModerationNotice userId={convexUser._id} />}
       <Outlet context={{ user }} />
       {!hideNav && <MobileBottomNav />}
     </>
@@ -143,8 +146,14 @@ function BannedScreen({ reason, bannedAt }: { reason?: string; bannedAt?: number
 
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            If you believe this was a mistake, please contact support.
+            If you believe this was a mistake, you can submit an appeal.
           </p>
+          <Link to="/appeal">
+            <Button className="w-full mb-2">
+              <Scale className="w-4 h-4 mr-2" />
+              Submit Appeal
+            </Button>
+          </Link>
           <Button onClick={handleSignOut} variant="outline" className="w-full">
             Sign Out
           </Button>
@@ -216,8 +225,14 @@ function SuspendedScreen({ suspendedUntil }: { suspendedUntil: number }) {
 
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            If you believe this was a mistake, please contact support.
+            If you believe this was a mistake, you can submit an appeal.
           </p>
+          <Link to="/appeal">
+            <Button className="w-full mb-2">
+              <Scale className="w-4 h-4 mr-2" />
+              Submit Appeal
+            </Button>
+          </Link>
           <Button onClick={handleSignOut} variant="outline" className="w-full">
             Sign Out
           </Button>

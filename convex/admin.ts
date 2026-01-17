@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // ============================================================================
 // ADMIN AUTH HELPERS
@@ -459,6 +460,21 @@ export const banUser = mutation({
       suspendedUntil: undefined,
     });
 
+    // Create moderation notification
+    await ctx.scheduler.runAfter(0, internal.moderation.createModerationNotification, {
+      userId: args.userId,
+      type: "ban",
+      reason: args.reason,
+    });
+
+    // Send push notification
+    await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+      recipientUserId: args.userId,
+      title: "Account Banned",
+      body: "Your account has been permanently banned. You may submit an appeal.",
+      data: { type: "moderation", url: "/appeal" },
+    });
+
     return { success: true };
   },
 });
@@ -508,9 +524,27 @@ export const suspendUser = mutation({
       throw new Error("Cannot suspend another admin");
     }
 
+    const suspendedUntil = Date.now() + args.days * 24 * 60 * 60 * 1000;
+
     await ctx.db.patch(args.userId, {
       isSuspended: true,
-      suspendedUntil: Date.now() + args.days * 24 * 60 * 60 * 1000,
+      suspendedUntil,
+    });
+
+    // Create moderation notification
+    await ctx.scheduler.runAfter(0, internal.moderation.createModerationNotification, {
+      userId: args.userId,
+      type: "suspension",
+      reason: args.reason,
+      suspendedUntil,
+    });
+
+    // Send push notification
+    await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+      recipientUserId: args.userId,
+      title: "Account Suspended",
+      body: `Your account has been suspended for ${args.days} days.`,
+      data: { type: "moderation", url: "/appeal" },
     });
 
     return { success: true };
@@ -541,8 +575,9 @@ export const warnUser = mutation({
   args: {
     adminUserId: v.id("users"),
     userId: v.id("users"),
+    reason: v.optional(v.string()),
   },
-  returns: v.object({ success: v.boolean(), newCount: v.number() }),
+  returns: v.object({ success: v.boolean(), newCount: v.number(), autoEscalated: v.optional(v.string()) }),
   handler: async (ctx, args) => {
     await requireAdmin(ctx, args.adminUserId as string);
 
@@ -551,14 +586,132 @@ export const warnUser = mutation({
       throw new Error("User not found");
     }
 
+    if (user.isAdmin) {
+      throw new Error("Cannot warn an admin");
+    }
+
+    if (user.isBanned) {
+      throw new Error("User is already banned");
+    }
+
     const newCount = (user.warningCount ?? 0) + 1;
     await ctx.db.patch(args.userId, {
       warningCount: newCount,
     });
 
-    return { success: true, newCount };
+    // Create moderation notification
+    await ctx.scheduler.runAfter(0, internal.moderation.createModerationNotification, {
+      userId: args.userId,
+      type: "warning",
+      reason: args.reason,
+      warningNumber: newCount,
+    });
+
+    // Send push notification
+    await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+      recipientUserId: args.userId,
+      title: "Account Warning",
+      body: `You have received warning ${newCount}. Please review our community guidelines.`,
+      data: { type: "moderation" },
+    });
+
+    // Check for auto-escalation rules
+    const autoEscalated = await checkAutoEscalation(ctx, args.userId, "warning_count", newCount, args.reason);
+
+    return { success: true, newCount, autoEscalated };
   },
 });
+
+// Internal function to check and apply auto-escalation rules
+async function checkAutoEscalation(
+  ctx: any,
+  userId: any,
+  triggerType: "warning_count" | "report_count",
+  currentValue: number,
+  reason?: string
+): Promise<string | undefined> {
+  // Get enabled rules for this trigger type, sorted by threshold descending
+  const rules = await ctx.db
+    .query("moderationRules")
+    .withIndex("by_enabled", (q: any) => q.eq("enabled", true))
+    .filter((q: any) => q.eq(q.field("triggerType"), triggerType))
+    .collect();
+
+  // Sort by threshold descending to apply the highest applicable rule
+  const sortedRules = rules.sort((a: any, b: any) => b.threshold - a.threshold);
+
+  for (const rule of sortedRules) {
+    if (currentValue >= rule.threshold) {
+      const user = await ctx.db.get(userId);
+      if (!user || user.isBanned || user.isAdmin) continue;
+
+      // Skip if action is suspension but user is already suspended
+      if (rule.action === "suspension" && user.isSuspended) continue;
+
+      const autoReason = reason
+        ? `${reason} (Auto-escalated: ${rule.name})`
+        : `Auto-escalated: ${rule.name}`;
+
+      switch (rule.action) {
+        case "suspension":
+          if (!user.isSuspended) {
+            const suspendedUntil = Date.now() + (rule.suspensionDays ?? 7) * 24 * 60 * 60 * 1000;
+            await ctx.db.patch(userId, {
+              isSuspended: true,
+              suspendedUntil,
+            });
+
+            // Create notification
+            await ctx.scheduler.runAfter(0, internal.moderation.createModerationNotification, {
+              userId,
+              type: "suspension",
+              reason: autoReason,
+              suspendedUntil,
+            });
+
+            // Send push notification
+            await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+              recipientUserId: userId,
+              title: "Account Suspended",
+              body: `Your account has been suspended for ${rule.suspensionDays ?? 7} days.`,
+              data: { type: "moderation", url: "/appeal" },
+            });
+
+            return `suspension (${rule.suspensionDays ?? 7} days)`;
+          }
+          break;
+
+        case "ban":
+          await ctx.db.patch(userId, {
+            isBanned: true,
+            bannedAt: Date.now(),
+            bannedReason: autoReason,
+            isSuspended: false,
+            suspendedUntil: undefined,
+          });
+
+          // Create notification
+          await ctx.scheduler.runAfter(0, internal.moderation.createModerationNotification, {
+            userId,
+            type: "ban",
+            reason: autoReason,
+          });
+
+          // Send push notification
+          await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+            recipientUserId: userId,
+            title: "Account Banned",
+            body: "Your account has been permanently banned.",
+            data: { type: "moderation", url: "/appeal" },
+          });
+
+          return "ban";
+      }
+    }
+  }
+
+  return undefined;
+}
 
 // Clear warnings for a user
 export const clearWarnings = mutation({
@@ -627,5 +780,608 @@ export const clearExpiredSuspensions = internalMutation({
     }
 
     return { clearedCount: expiredSuspensions.length };
+  },
+});
+
+// ============================================================================
+// MESSAGE REPORTS MANAGEMENT
+// ============================================================================
+
+export const getMessageReports = query({
+  args: {
+    adminUserId: v.id("users"),
+    status: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("reviewed"),
+      v.literal("resolved"),
+      v.literal("dismissed")
+    )),
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    const limit = args.limit ?? 50;
+    const offset = args.offset ?? 0;
+
+    // Get reports, optionally filtered by status
+    let reports;
+    if (args.status) {
+      reports = await ctx.db
+        .query("reportedMessages")
+        .withIndex("by_status", (q) => q.eq("status", args.status!))
+        .order("desc")
+        .collect();
+    } else {
+      reports = await ctx.db
+        .query("reportedMessages")
+        .order("desc")
+        .collect();
+    }
+
+    // Apply pagination
+    const paginatedReports = reports.slice(offset, offset + limit);
+
+    // Populate details
+    const reportsWithDetails = await Promise.all(
+      paginatedReports.map(async (report) => {
+        const [reporter, messageSender, message, reviewer] = await Promise.all([
+          ctx.db.get(report.reporterId),
+          ctx.db.get(report.messageSenderId),
+          ctx.db.get(report.messageId),
+          report.reviewedBy ? ctx.db.get(report.reviewedBy) : null,
+        ]);
+
+        const senderProfile = messageSender ? await ctx.db
+          .query("profiles")
+          .withIndex("by_userId", (q) => q.eq("userId", messageSender._id))
+          .unique() : null;
+
+        return {
+          _id: report._id,
+          reason: report.reason,
+          details: report.details,
+          reportedAt: report.reportedAt,
+          status: report.status,
+          adminNotes: report.adminNotes,
+          actionTaken: report.actionTaken,
+          reviewedAt: report.reviewedAt,
+          message: message ? {
+            _id: message._id,
+            content: message.content,
+            format: message.format,
+            sentAt: message.sentAt,
+            isHidden: message.isHidden ?? false,
+          } : null,
+          reporter: reporter ? {
+            _id: reporter._id,
+            name: reporter.name,
+            email: reporter.email,
+            imageUrl: reporter.imageUrl,
+          } : null,
+          messageSender: messageSender ? {
+            _id: messageSender._id,
+            name: messageSender.name,
+            email: messageSender.email,
+            imageUrl: messageSender.imageUrl,
+            isBanned: messageSender.isBanned,
+            isSuspended: messageSender.isSuspended,
+            warningCount: messageSender.warningCount ?? 0,
+            displayName: senderProfile?.displayName,
+          } : null,
+          reviewer: reviewer ? {
+            _id: reviewer._id,
+            name: reviewer.name,
+          } : null,
+        };
+      })
+    );
+
+    return {
+      reports: reportsWithDetails,
+      total: reports.length,
+      hasMore: offset + limit < reports.length,
+    };
+  },
+});
+
+// Hide a message
+export const hideMessage = mutation({
+  args: {
+    adminUserId: v.id("users"),
+    messageId: v.id("messages"),
+    reason: v.string(),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    const message = await ctx.db.get(args.messageId);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+
+    await ctx.db.patch(args.messageId, {
+      isHidden: true,
+      hiddenAt: Date.now(),
+      hiddenBy: args.adminUserId,
+      hiddenReason: args.reason,
+    });
+
+    return { success: true };
+  },
+});
+
+// Unhide a message
+export const unhideMessage = mutation({
+  args: {
+    adminUserId: v.id("users"),
+    messageId: v.id("messages"),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    await ctx.db.patch(args.messageId, {
+      isHidden: false,
+      hiddenAt: undefined,
+      hiddenBy: undefined,
+      hiddenReason: undefined,
+    });
+
+    return { success: true };
+  },
+});
+
+// Update message report status and take action
+export const updateMessageReportStatus = mutation({
+  args: {
+    adminUserId: v.id("users"),
+    reportId: v.id("reportedMessages"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("reviewed"),
+      v.literal("resolved"),
+      v.literal("dismissed")
+    ),
+    adminNotes: v.optional(v.string()),
+    actionTaken: v.optional(v.union(
+      v.literal("none"),
+      v.literal("message_hidden"),
+      v.literal("user_warning"),
+      v.literal("user_suspension"),
+      v.literal("user_ban")
+    )),
+    suspensionDays: v.optional(v.number()),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    const report = await ctx.db.get(args.reportId);
+    if (!report) {
+      throw new Error("Report not found");
+    }
+
+    // Update report
+    await ctx.db.patch(args.reportId, {
+      status: args.status,
+      reviewedBy: args.adminUserId,
+      reviewedAt: Date.now(),
+      adminNotes: args.adminNotes,
+      actionTaken: args.actionTaken,
+    });
+
+    // Take action based on actionTaken
+    if (args.actionTaken && args.actionTaken !== "none") {
+      const message = await ctx.db.get(report.messageId);
+
+      switch (args.actionTaken) {
+        case "message_hidden":
+          if (message) {
+            await ctx.db.patch(report.messageId, {
+              isHidden: true,
+              hiddenAt: Date.now(),
+              hiddenBy: args.adminUserId,
+              hiddenReason: args.adminNotes ?? report.reason,
+            });
+          }
+          break;
+
+        case "user_warning":
+          const userToWarn = await ctx.db.get(report.messageSenderId);
+          if (userToWarn) {
+            await ctx.db.patch(report.messageSenderId, {
+              warningCount: (userToWarn.warningCount ?? 0) + 1,
+            });
+          }
+          break;
+
+        case "user_suspension":
+          const userToSuspend = await ctx.db.get(report.messageSenderId);
+          if (userToSuspend && !userToSuspend.isAdmin) {
+            const suspensionDays = args.suspensionDays ?? 7;
+            await ctx.db.patch(report.messageSenderId, {
+              isSuspended: true,
+              suspendedUntil: Date.now() + suspensionDays * 24 * 60 * 60 * 1000,
+            });
+          }
+          break;
+
+        case "user_ban":
+          const userToBan = await ctx.db.get(report.messageSenderId);
+          if (userToBan && !userToBan.isAdmin) {
+            await ctx.db.patch(report.messageSenderId, {
+              isBanned: true,
+              bannedAt: Date.now(),
+              bannedReason: args.adminNotes ?? report.reason,
+              isSuspended: false,
+              suspendedUntil: undefined,
+            });
+          }
+          break;
+      }
+    }
+
+    return { success: true };
+  },
+});
+
+// ============================================================================
+// MODERATION RULES MANAGEMENT
+// ============================================================================
+
+// Get all moderation rules
+export const getModerationRules = query({
+  args: {
+    adminUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    const rules = await ctx.db
+      .query("moderationRules")
+      .order("desc")
+      .collect();
+
+    return rules;
+  },
+});
+
+// Create a new moderation rule
+export const createModerationRule = mutation({
+  args: {
+    adminUserId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    enabled: v.boolean(),
+    triggerType: v.union(v.literal("warning_count"), v.literal("report_count")),
+    threshold: v.number(),
+    action: v.union(v.literal("warning"), v.literal("suspension"), v.literal("ban")),
+    suspensionDays: v.optional(v.number()),
+  },
+  returns: v.id("moderationRules"),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    const now = Date.now();
+    const ruleId = await ctx.db.insert("moderationRules", {
+      name: args.name,
+      description: args.description,
+      enabled: args.enabled,
+      triggerType: args.triggerType,
+      threshold: args.threshold,
+      action: args.action,
+      suspensionDays: args.suspensionDays,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return ruleId;
+  },
+});
+
+// Update a moderation rule
+export const updateModerationRule = mutation({
+  args: {
+    adminUserId: v.id("users"),
+    ruleId: v.id("moderationRules"),
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+    enabled: v.optional(v.boolean()),
+    triggerType: v.optional(v.union(v.literal("warning_count"), v.literal("report_count"))),
+    threshold: v.optional(v.number()),
+    action: v.optional(v.union(v.literal("warning"), v.literal("suspension"), v.literal("ban"))),
+    suspensionDays: v.optional(v.number()),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    const rule = await ctx.db.get(args.ruleId);
+    if (!rule) {
+      throw new Error("Rule not found");
+    }
+
+    const updates: Record<string, any> = { updatedAt: Date.now() };
+    if (args.name !== undefined) updates.name = args.name;
+    if (args.description !== undefined) updates.description = args.description;
+    if (args.enabled !== undefined) updates.enabled = args.enabled;
+    if (args.triggerType !== undefined) updates.triggerType = args.triggerType;
+    if (args.threshold !== undefined) updates.threshold = args.threshold;
+    if (args.action !== undefined) updates.action = args.action;
+    if (args.suspensionDays !== undefined) updates.suspensionDays = args.suspensionDays;
+
+    await ctx.db.patch(args.ruleId, updates);
+
+    return { success: true };
+  },
+});
+
+// Delete a moderation rule
+export const deleteModerationRule = mutation({
+  args: {
+    adminUserId: v.id("users"),
+    ruleId: v.id("moderationRules"),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    const rule = await ctx.db.get(args.ruleId);
+    if (!rule) {
+      throw new Error("Rule not found");
+    }
+
+    await ctx.db.delete(args.ruleId);
+
+    return { success: true };
+  },
+});
+
+// Seed default moderation rules (for initial setup)
+export const seedDefaultModerationRules = mutation({
+  args: {
+    adminUserId: v.id("users"),
+  },
+  returns: v.object({ success: v.boolean(), rulesCreated: v.number() }),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    // Check if any rules already exist
+    const existingRules = await ctx.db.query("moderationRules").collect();
+    if (existingRules.length > 0) {
+      return { success: true, rulesCreated: 0 };
+    }
+
+    const now = Date.now();
+    const defaultRules = [
+      {
+        name: "3 Warnings = 7-day Suspension",
+        description: "Automatically suspend users who reach 3 warnings",
+        triggerType: "warning_count" as const,
+        threshold: 3,
+        action: "suspension" as const,
+        suspensionDays: 7,
+      },
+      {
+        name: "5 Warnings = Permanent Ban",
+        description: "Automatically ban users who reach 5 warnings",
+        triggerType: "warning_count" as const,
+        threshold: 5,
+        action: "ban" as const,
+      },
+    ];
+
+    for (const rule of defaultRules) {
+      await ctx.db.insert("moderationRules", {
+        ...rule,
+        enabled: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return { success: true, rulesCreated: defaultRules.length };
+  },
+});
+
+// ============================================================================
+// APPEALS MANAGEMENT
+// ============================================================================
+
+// Get all appeals for admin review
+export const getAllAppeals = query({
+  args: {
+    adminUserId: v.id("users"),
+    status: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("under_review"),
+      v.literal("accepted"),
+      v.literal("rejected")
+    )),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    const limit = args.limit ?? 50;
+
+    let appeals;
+    if (args.status) {
+      appeals = await ctx.db
+        .query("appeals")
+        .withIndex("by_status", (q) => q.eq("status", args.status!))
+        .order("desc")
+        .take(limit);
+    } else {
+      appeals = await ctx.db
+        .query("appeals")
+        .withIndex("by_submittedAt")
+        .order("desc")
+        .take(limit);
+    }
+
+    // Enrich with user info
+    const enrichedAppeals = await Promise.all(
+      appeals.map(async (appeal) => {
+        const user = await ctx.db.get(appeal.userId);
+        const profile = user
+          ? await ctx.db
+              .query("profiles")
+              .withIndex("by_userId", (q) => q.eq("userId", user._id))
+              .first()
+          : null;
+
+        const reviewedByUser = appeal.reviewedBy
+          ? await ctx.db.get(appeal.reviewedBy)
+          : null;
+
+        return {
+          ...appeal,
+          user: user
+            ? {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                imageUrl: user.imageUrl,
+                isBanned: user.isBanned,
+                isSuspended: user.isSuspended,
+                suspendedUntil: user.suspendedUntil,
+                warningCount: user.warningCount,
+              }
+            : null,
+          profile: profile
+            ? {
+                displayName: profile.displayName,
+              }
+            : null,
+          reviewedByUser: reviewedByUser
+            ? {
+                name: reviewedByUser.name,
+              }
+            : null,
+        };
+      })
+    );
+
+    return enrichedAppeals;
+  },
+});
+
+// Get appeal counts by status
+export const getAppealCounts = query({
+  args: {
+    adminUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    const allAppeals = await ctx.db.query("appeals").collect();
+
+    return {
+      pending: allAppeals.filter((a) => a.status === "pending").length,
+      under_review: allAppeals.filter((a) => a.status === "under_review").length,
+      accepted: allAppeals.filter((a) => a.status === "accepted").length,
+      rejected: allAppeals.filter((a) => a.status === "rejected").length,
+      total: allAppeals.length,
+    };
+  },
+});
+
+// Update appeal status (accept/reject)
+export const updateAppealStatus = mutation({
+  args: {
+    adminUserId: v.id("users"),
+    appealId: v.id("appeals"),
+    status: v.union(
+      v.literal("under_review"),
+      v.literal("accepted"),
+      v.literal("rejected")
+    ),
+    adminResponse: v.optional(v.string()),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.adminUserId as string);
+
+    const appeal = await ctx.db.get(args.appealId);
+    if (!appeal) {
+      throw new Error("Appeal not found");
+    }
+
+    const user = await ctx.db.get(appeal.userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Update appeal status
+    await ctx.db.patch(args.appealId, {
+      status: args.status,
+      reviewedBy: args.adminUserId,
+      reviewedAt: Date.now(),
+      adminResponse: args.adminResponse,
+    });
+
+    // If accepted, lift the ban/suspension based on appeal type
+    if (args.status === "accepted") {
+      if (appeal.appealType === "ban") {
+        await ctx.db.patch(appeal.userId, {
+          isBanned: false,
+          bannedAt: undefined,
+          bannedReason: undefined,
+        });
+      } else if (appeal.appealType === "suspension") {
+        await ctx.db.patch(appeal.userId, {
+          isSuspended: false,
+          suspendedUntil: undefined,
+        });
+      } else if (appeal.appealType === "warning") {
+        // Reduce warning count by 1 (but not below 0)
+        const currentWarnings = user.warningCount ?? 0;
+        await ctx.db.patch(appeal.userId, {
+          warningCount: Math.max(0, currentWarnings - 1),
+        });
+      }
+
+      // Create notification for user
+      await ctx.scheduler.runAfter(0, internal.moderation.createModerationNotification, {
+        userId: appeal.userId,
+        type: "appeal_accepted",
+        reason: args.adminResponse || "Your appeal has been accepted.",
+        appealId: args.appealId,
+      });
+
+      // Send push notification
+      await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+        recipientUserId: appeal.userId,
+        title: "Appeal Accepted",
+        body: "Your appeal has been reviewed and accepted.",
+        data: {
+          type: "moderation",
+        },
+      });
+    } else if (args.status === "rejected") {
+      // Create notification for user
+      await ctx.scheduler.runAfter(0, internal.moderation.createModerationNotification, {
+        userId: appeal.userId,
+        type: "appeal_rejected",
+        reason: args.adminResponse || "Your appeal has been reviewed and rejected.",
+        appealId: args.appealId,
+      });
+
+      // Send push notification
+      await ctx.scheduler.runAfter(0, internal.pushNotifications.queuePushNotification, {
+        recipientUserId: appeal.userId,
+        title: "Appeal Decision",
+        body: "Your appeal has been reviewed. Check the app for details.",
+        data: {
+          type: "moderation",
+        },
+      });
+    }
+
+    return { success: true };
   },
 });

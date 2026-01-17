@@ -17,7 +17,7 @@ export const sendPushNotifications = internalAction({
     icon: v.optional(v.string()),
     tag: v.optional(v.string()),
     data: v.optional(v.object({
-      type: v.union(v.literal("message"), v.literal("wave")),
+      type: v.union(v.literal("message"), v.literal("wave"), v.literal("moderation")),
       conversationId: v.optional(v.id("conversations")),
       senderId: v.optional(v.id("users")),
       url: v.optional(v.string()),

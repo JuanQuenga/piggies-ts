@@ -181,3 +181,64 @@ export function useAdminUserDetails(userId: Id<"users"> | undefined) {
     isLoading: userDetails === undefined,
   }
 }
+
+/**
+ * Hook to manage message reports in admin panel
+ */
+export function useAdminMessageReports(status?: "pending" | "reviewed" | "resolved" | "dismissed") {
+  const { user } = useCurrentUser()
+
+  const isAdmin = useQuery(
+    api.admin.isAdmin,
+    user?._id ? { userId: user._id } : "skip"
+  )
+
+  const reportsData = useQuery(
+    api.admin.getMessageReports,
+    user?._id && isAdmin ? { adminUserId: user._id, status } : "skip"
+  )
+
+  const updateReportStatus = useMutation(api.admin.updateMessageReportStatus)
+  const hideMessageMutation = useMutation(api.admin.hideMessage)
+  const unhideMessageMutation = useMutation(api.admin.unhideMessage)
+
+  const handleUpdateReport = async (
+    reportId: Id<"reportedMessages">,
+    newStatus: "pending" | "reviewed" | "resolved" | "dismissed",
+    options?: {
+      adminNotes?: string
+      actionTaken?: "none" | "message_hidden" | "user_warning" | "user_suspension" | "user_ban"
+      suspensionDays?: number
+    }
+  ) => {
+    if (!user?._id) return
+    await updateReportStatus({
+      adminUserId: user._id,
+      reportId,
+      status: newStatus,
+      adminNotes: options?.adminNotes,
+      actionTaken: options?.actionTaken,
+      suspensionDays: options?.suspensionDays,
+    })
+  }
+
+  const hideMessage = async (messageId: Id<"messages">, reason: string) => {
+    if (!user?._id) return
+    return hideMessageMutation({ adminUserId: user._id, messageId, reason })
+  }
+
+  const unhideMessage = async (messageId: Id<"messages">) => {
+    if (!user?._id) return
+    return unhideMessageMutation({ adminUserId: user._id, messageId })
+  }
+
+  return {
+    reports: reportsData?.reports ?? [],
+    total: reportsData?.total ?? 0,
+    hasMore: reportsData?.hasMore ?? false,
+    isLoading: reportsData === undefined,
+    updateReport: handleUpdateReport,
+    hideMessage,
+    unhideMessage,
+  }
+}

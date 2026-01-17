@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { requireNotModerated } from "./lib/moderationCheck";
 
 // Sync user from WorkOS AuthKit - called on login
 export const syncUser = mutation({
@@ -257,6 +258,9 @@ export const updateProfile = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.userId);
+
     const profile = await ctx.db
       .query("profiles")
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
@@ -287,6 +291,9 @@ export const updateLocation = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.userId);
+
     const profile = await ctx.db
       .query("profiles")
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
@@ -672,6 +679,9 @@ export const blockUser = mutation({
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.blockerId);
+
     if (args.blockerId === args.blockedId) {
       throw new Error("Cannot block yourself");
     }
@@ -795,6 +805,9 @@ export const reportUser = mutation({
   },
   returns: v.object({ success: v.boolean(), reportId: v.id("reportedUsers") }),
   handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.reporterId);
+
     if (args.reporterId === args.reportedId) {
       throw new Error("Cannot report yourself");
     }
@@ -824,6 +837,9 @@ export const addFavorite = mutation({
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.userId);
+
     if (args.userId === args.favoriteId) {
       throw new Error("Cannot favorite yourself");
     }
@@ -949,6 +965,9 @@ export const addProfilePhoto = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.userId);
+
     const profile = await ctx.db
       .query("profiles")
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))

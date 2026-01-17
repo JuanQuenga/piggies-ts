@@ -58,9 +58,13 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [showReportDialog, setShowReportDialog] = useState(false)
   const [showBlockDialog, setShowBlockDialog] = useState(false)
+  const [showReportMessageDialog, setShowReportMessageDialog] = useState(false)
+  const [selectedMessageId, setSelectedMessageId] = useState<Id<"messages"> | null>(null)
   const [reportReason, setReportReason] = useState("")
   const [reportDetails, setReportDetails] = useState("")
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const hasScrolledInitially = useRef(false)
 
@@ -99,6 +103,7 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
   const removeFavorite = useMutation(api.users.removeFavorite)
   const blockUser = useMutation(api.users.blockUser)
   const reportUser = useMutation(api.users.reportUser)
+  const reportMessage = useMutation(api.messages.reportMessage)
 
   // Mark messages as read when viewing
   useEffect(() => {
@@ -107,16 +112,12 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
     }
   }, [conversationId, currentUserId, markRead])
 
-  // Helper to scroll to bottom
+  // Helper to scroll to bottom using scrollIntoView for proper fixed UI handling
   const scrollToBottom = (smooth = false) => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    if (smooth) {
-      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" })
-    } else {
-      container.scrollTop = container.scrollHeight
-    }
+    messagesEndRef.current?.scrollIntoView({
+      behavior: smooth ? 'smooth' : 'instant',
+      block: 'end'
+    })
   }
 
   // Reset scroll state when conversation changes
@@ -124,13 +125,24 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
     hasScrolledInitially.current = false
   }, [conversationId])
 
-  // Initial scroll - use useLayoutEffect to scroll before browser paints
+  // Initial scroll - wait for first page to load, then multiple attempts to handle async rendering
   useLayoutEffect(() => {
-    if (messages && messages.length > 0 && !hasScrolledInitially.current) {
-      scrollToBottom(false)
+    if (status !== "LoadingFirstPage" && messages && messages.length > 0 && !hasScrolledInitially.current) {
       hasScrolledInitially.current = true
+
+      // Multiple scroll attempts as content renders
+      scrollToBottom(false)
+      const t1 = setTimeout(() => scrollToBottom(false), 0)
+      const t2 = setTimeout(() => scrollToBottom(false), 50)
+      const t3 = setTimeout(() => scrollToBottom(false), 150)
+
+      return () => {
+        clearTimeout(t1)
+        clearTimeout(t2)
+        clearTimeout(t3)
+      }
     }
-  }, [messages])
+  }, [messages, status])
 
   // Smooth scroll for new messages after initial load
   const lastMessageId = messages?.[0]?._id
@@ -159,6 +171,32 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showGifPicker, showAttachMenu])
+
+  // Detect keyboard open/close using visualViewport API
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+
+    const handleResize = () => {
+      // If visual viewport is significantly smaller than window height, keyboard is likely open
+      const keyboardOpen = viewport.height < window.innerHeight * 0.75
+      setIsKeyboardOpen(keyboardOpen)
+      if (keyboardOpen) {
+        // Scroll to bottom when keyboard opens
+        setTimeout(() => scrollToBottom(true), 50)
+      }
+    }
+
+    viewport.addEventListener('resize', handleResize)
+    return () => viewport.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Scroll to bottom when input is focused (keyboard opens on mobile)
+  const handleInputFocus = () => {
+    // Small delay to let keyboard animation start
+    setTimeout(() => scrollToBottom(true), 100)
+    setTimeout(() => scrollToBottom(true), 300)
+  }
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -254,6 +292,31 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
     } catch {
       toast.error("Failed to submit report")
     }
+  }
+
+  const handleReportMessage = async () => {
+    if (!selectedMessageId || !reportReason) return
+    try {
+      await reportMessage({
+        reporterId: currentUserId,
+        messageId: selectedMessageId,
+        reason: reportReason,
+        details: reportDetails || undefined,
+      })
+      setShowReportMessageDialog(false)
+      setSelectedMessageId(null)
+      setReportReason("")
+      setReportDetails("")
+      toast.success("Message reported successfully")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to report message"
+      toast.error(message)
+    }
+  }
+
+  const openReportMessageDialog = (messageId: Id<"messages">) => {
+    setSelectedMessageId(messageId)
+    setShowReportMessageDialog(true)
   }
 
   // Group messages by date
@@ -404,7 +467,7 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
       {/* Spacer for fixed input on mobile (at bottom, will be added after ScrollArea) */}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4 pb-20 lg:pb-4" viewportRef={scrollContainerRef}>
+      <ScrollArea className="flex-1 p-4" viewportRef={scrollContainerRef}>
         {/* Load more button */}
         {status === "CanLoadMore" && (
           <div className="flex justify-center mb-4">
@@ -512,48 +575,72 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
                           </div>
                         )}
 
-                        {/* Message bubble */}
-                        <div
-                          className={cn(
-                            "max-w-[70%]",
-                            message.format === "gif" || message.format === "image" || message.format === "video"
-                              ? "rounded-xl overflow-hidden"
-                              : message.format === "album_share"
-                                ? "px-4 py-3 rounded-2xl bg-card border border-border rounded-bl-md"
-                                : cn(
-                                    "px-4 py-2 rounded-2xl",
-                                    isOwn
-                                      ? "bg-primary text-primary-foreground rounded-br-md"
-                                      : "bg-card border border-border rounded-bl-md"
-                                  )
-                          )}
-                        >
-                          <MessageContent message={message} isOwn={isOwn} currentUserId={currentUserId} />
-
-                          {/* Time and Read Receipt */}
-                          {showTime && (
-                            <div
-                              className={cn(
+                        {/* Message bubble with context menu for other's messages */}
+                        {!isOwn ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <div
+                                className={cn(
+                                  "max-w-[70%] cursor-pointer text-left",
+                                  message.format === "gif" || message.format === "image" || message.format === "video"
+                                    ? "rounded-xl overflow-hidden"
+                                    : message.format === "album_share"
+                                      ? "px-4 py-3 rounded-2xl bg-card border border-border rounded-bl-md"
+                                      : "px-4 py-2 rounded-2xl bg-card border border-border rounded-bl-md"
+                                )}
+                              >
+                                <MessageContent message={message} isOwn={isOwn} currentUserId={currentUserId} />
+                                {showTime && (
+                                  <div className={cn(
+                                    "flex items-center gap-1 text-[10px] mt-1",
+                                    message.format === "gif" || message.format === "image" || message.format === "video"
+                                      ? "text-muted-foreground px-1"
+                                      : "text-muted-foreground"
+                                  )}>
+                                    <span>{formatTime(message.sentAt)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-40">
+                              <DropdownMenuItem
+                                onClick={() => openReportMessageDialog(message._id)}
+                                className="text-amber-600 focus:text-amber-600"
+                              >
+                                <Flag className="w-4 h-4 mr-2" />
+                                Report message
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : (
+                          <div
+                            className={cn(
+                              "max-w-[70%]",
+                              message.format === "gif" || message.format === "image" || message.format === "video"
+                                ? "rounded-xl overflow-hidden"
+                                : message.format === "album_share"
+                                  ? "px-4 py-3 rounded-2xl bg-card border border-border rounded-br-md"
+                                  : "px-4 py-2 rounded-2xl bg-primary text-primary-foreground rounded-br-md"
+                            )}
+                          >
+                            <MessageContent message={message} isOwn={isOwn} currentUserId={currentUserId} />
+                            {showTime && (
+                              <div className={cn(
                                 "flex items-center gap-1 text-[10px] mt-1",
                                 message.format === "gif" || message.format === "image" || message.format === "video"
                                   ? "text-muted-foreground px-1"
-                                  : message.format === "album_share"
-                                    ? "text-muted-foreground"
-                                    : isOwn
-                                      ? "text-primary-foreground/70"
-                                      : "text-muted-foreground"
-                              )}
-                            >
-                              <span>{formatTime(message.sentAt)}</span>
-                              {/* Read receipt for Ultra members on own messages */}
-                              {isOwn && isUltra && otherUserId && message.readAt?.[otherUserId] && (
-                                <span className="flex items-center gap-0.5 text-blue-400">
-                                  <CheckCheck className="w-3 h-3" />
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                                  : "text-primary-foreground/70"
+                              )}>
+                                <span>{formatTime(message.sentAt)}</span>
+                                {isUltra && otherUserId && message.readAt?.[otherUserId] && (
+                                  <span className="flex items-center gap-0.5 text-blue-400">
+                                    <CheckCheck className="w-3 h-3" />
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -563,6 +650,13 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
           </div>
         )}
 
+        {/* Spacer for fixed input and bottom nav on mobile - smaller when keyboard is open */}
+        <div className={cn(
+          "shrink-0 transition-all duration-200 lg:h-4",
+          isKeyboardOpen ? "h-16" : "h-36"
+        )} />
+        {/* Scroll anchor for scrollIntoView */}
+        <div ref={messagesEndRef} />
       </ScrollArea>
 
       {/* Message Input - fixed at bottom on mobile */}
@@ -662,6 +756,7 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
           ref={inputRef}
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
+          onFocus={handleInputFocus}
           placeholder="Type a message..."
           className="flex-1"
           disabled={isSending}
@@ -738,6 +833,61 @@ export function ChatView({ conversationId, currentUserId, onBack }: ChatViewProp
               Cancel
             </Button>
             <Button onClick={handleReportUser} disabled={!reportReason}>
+              Submit Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Message Dialog */}
+      <Dialog open={showReportMessageDialog} onOpenChange={(open) => {
+        setShowReportMessageDialog(open)
+        if (!open) {
+          setSelectedMessageId(null)
+          setReportReason("")
+          setReportDetails("")
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report Message</DialogTitle>
+            <DialogDescription>
+              Help us understand what's wrong with this message. Your report will be reviewed by our team.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reason</label>
+              <select
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Select a reason...</option>
+                <option value="spam">Spam</option>
+                <option value="harassment">Harassment</option>
+                <option value="inappropriate_content">Inappropriate Content</option>
+                <option value="threats">Threats or Violence</option>
+                <option value="hate_speech">Hate Speech</option>
+                <option value="scam">Scam or Fraud</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Additional details (optional)</label>
+              <textarea
+                value={reportDetails}
+                onChange={(e) => setReportDetails(e.target.value)}
+                placeholder="Tell us more about what's wrong with this message..."
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReportMessageDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleReportMessage} disabled={!reportReason}>
               Submit Report
             </Button>
           </DialogFooter>

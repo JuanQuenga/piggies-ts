@@ -63,9 +63,9 @@ export function AppHeader() {
   const [isGettingLocation, setIsGettingLocation] = useState(false)
   const [isSettingCustomLocation, setIsSettingCustomLocation] = useState(false)
 
-  // Load location from localStorage on mount
+  // Load location from localStorage on mount and listen for external updates
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    const loadLocationFromStorage = () => {
       const savedType = localStorage.getItem('piggies-location-type')
       if (savedType === 'nearby' || savedType === 'custom') {
         setLocationType(savedType)
@@ -74,6 +74,20 @@ export function AppHeader() {
       if (savedCustom) setCustomLocation(savedCustom)
       const savedNearby = localStorage.getItem('piggies-nearby-location')
       if (savedNearby) setNearbyLocationName(savedNearby)
+    }
+
+    if (typeof window !== 'undefined') {
+      loadLocationFromStorage()
+
+      // Listen for location updates from useLocationTracking hook
+      const handleLocationChanged = () => {
+        loadLocationFromStorage()
+      }
+      window.addEventListener('location-changed', handleLocationChanged)
+
+      return () => {
+        window.removeEventListener('location-changed', handleLocationChanged)
+      }
     }
   }, [])
 
@@ -169,7 +183,7 @@ export function AppHeader() {
       {
         enableHighAccuracy: false, // Use false for faster response
         timeout: 15000, // Longer timeout for mobile
-        maximumAge: 300000 // Cache for 5 minutes
+        maximumAge: 60000, // Cache for 1 minute (reduced from 5 min for fresher location)
       },
     )
   }

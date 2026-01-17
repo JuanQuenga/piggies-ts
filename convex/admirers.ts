@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { requireNotModerated } from "./lib/moderationCheck";
 
 // ============================================================================
 // SUBSCRIPTION-BASED LIMITS FOR ADMIRERS
@@ -31,6 +32,9 @@ export const sendWave = mutation({
     wavesRemaining: v.optional(v.number()),
   }),
   handler: async (ctx, args) => {
+    // Check if user is banned or suspended
+    await requireNotModerated(ctx, args.waverId);
+
     if (args.waverId === args.wavedAtId) {
       return { success: false, alreadyWaved: false };
     }

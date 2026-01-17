@@ -163,6 +163,19 @@ export function useLocationTracking() {
 
       // Store the updated location data
       storeLocationData({ timestamp: now, latitude, longitude })
+
+      // Also update UI localStorage keys if user is in "nearby" mode
+      // This keeps the UI in sync with the automatic location updates
+      const currentLocationType = localStorage.getItem('piggies-location-type')
+      if (currentLocationType === 'nearby' || !currentLocationType) {
+        localStorage.setItem(
+          'piggies-nearby-coords',
+          JSON.stringify({ latitude, longitude })
+        )
+        localStorage.setItem('piggies-nearby-location', locationName)
+        // Dispatch event so UI components can react
+        window.dispatchEvent(new Event('location-changed'))
+      }
     } catch {
       // Silently fail - don't block UI for location errors
     } finally {
