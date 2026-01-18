@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
@@ -119,6 +119,37 @@ function UserProfilePage() {
 
   const handleNextPhoto = () => {
     setCurrentPhotoIndex((prev) => (prev < photos.length - 1 ? prev + 1 : 0))
+  }
+
+  // Touch swipe handling for mobile
+  const touchStartX = useRef<number | null>(null)
+  const touchEndX = useRef<number | null>(null)
+  const minSwipeDistance = 50
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchEndX.current = null
+    touchStartX.current = e.targetTouches[0].clientX
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX
+  }
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return
+
+    const distance = touchStartX.current - touchEndX.current
+    const isLeftSwipe = distance > minSwipeDistance
+    const isRightSwipe = distance < -minSwipeDistance
+
+    if (isLeftSwipe && hasMultiplePhotos) {
+      handleNextPhoto()
+    } else if (isRightSwipe && hasMultiplePhotos) {
+      handlePrevPhoto()
+    }
+
+    touchStartX.current = null
+    touchEndX.current = null
   }
 
   const handleToggleFavorite = async () => {
@@ -307,7 +338,12 @@ function UserProfilePage() {
           {/* Photo Section - Left side on desktop */}
           <div className="lg:w-1/2 lg:sticky lg:top-28 lg:self-start">
             {/* Main Photo */}
-            <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-card">
+            <div
+              className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-card touch-pan-y"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
               {currentPhoto ? (
                 <img
                   src={currentPhoto}
