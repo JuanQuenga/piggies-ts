@@ -24,6 +24,7 @@ import { Route as AuthenticatedReferralsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedPhotosRouteImport } from './routes/_authenticated/photos'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedNearbyRouteImport } from './routes/_authenticated/nearby'
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
 import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticated/members'
 import { Route as AuthenticatedLookingNowRouteImport } from './routes/_authenticated/looking-now'
@@ -116,6 +117,11 @@ const AuthenticatedPhotosRoute = AuthenticatedPhotosRouteImport.update({
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedNearbyRoute = AuthenticatedNearbyRouteImport.update({
+  id: '/nearby',
+  path: '/nearby',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedMessagesRoute = AuthenticatedMessagesRouteImport.update({
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/looking-now': typeof AuthenticatedLookingNowRoute
   '/members': typeof AuthenticatedMembersRoute
   '/messages': typeof AuthenticatedMessagesRoute
+  '/nearby': typeof AuthenticatedNearbyRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/photos': typeof AuthenticatedPhotosRoute
   '/profile': typeof AuthenticatedProfileRoute
@@ -260,6 +267,7 @@ export interface FileRoutesByTo {
   '/looking-now': typeof AuthenticatedLookingNowRoute
   '/members': typeof AuthenticatedMembersRoute
   '/messages': typeof AuthenticatedMessagesRoute
+  '/nearby': typeof AuthenticatedNearbyRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/photos': typeof AuthenticatedPhotosRoute
   '/profile': typeof AuthenticatedProfileRoute
@@ -296,6 +304,7 @@ export interface FileRoutesById {
   '/_authenticated/looking-now': typeof AuthenticatedLookingNowRoute
   '/_authenticated/members': typeof AuthenticatedMembersRoute
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
+  '/_authenticated/nearby': typeof AuthenticatedNearbyRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/photos': typeof AuthenticatedPhotosRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
@@ -332,6 +341,7 @@ export interface FileRouteTypes {
     | '/looking-now'
     | '/members'
     | '/messages'
+    | '/nearby'
     | '/onboarding'
     | '/photos'
     | '/profile'
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/looking-now'
     | '/members'
     | '/messages'
+    | '/nearby'
     | '/onboarding'
     | '/photos'
     | '/profile'
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/_authenticated/looking-now'
     | '/_authenticated/members'
     | '/_authenticated/messages'
+    | '/_authenticated/nearby'
     | '/_authenticated/onboarding'
     | '/_authenticated/photos'
     | '/_authenticated/profile'
@@ -539,6 +551,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/nearby': {
+      id: '/_authenticated/nearby'
+      path: '/nearby'
+      fullPath: '/nearby'
+      preLoaderRoute: typeof AuthenticatedNearbyRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/messages': {
@@ -702,6 +721,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedLookingNowRoute: typeof AuthenticatedLookingNowRoute
   AuthenticatedMembersRoute: typeof AuthenticatedMembersRoute
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
+  AuthenticatedNearbyRoute: typeof AuthenticatedNearbyRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPhotosRoute: typeof AuthenticatedPhotosRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
@@ -721,6 +741,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedLookingNowRoute: AuthenticatedLookingNowRoute,
   AuthenticatedMembersRoute: AuthenticatedMembersRoute,
   AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
+  AuthenticatedNearbyRoute: AuthenticatedNearbyRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPhotosRoute: AuthenticatedPhotosRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,

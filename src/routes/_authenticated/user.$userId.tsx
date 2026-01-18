@@ -302,7 +302,7 @@ function UserProfilePage() {
       </div>
 
       {/* Main Content - Desktop: side by side, Mobile: stacked */}
-      <div className="max-w-6xl mx-auto p-4 pb-24">
+      <div className="max-w-6xl mx-auto p-4 pb-40 sm:pb-24">
         <div className="flex flex-col lg:flex-row lg:gap-8">
           {/* Photo Section - Left side on desktop */}
           <div className="lg:w-1/2 lg:sticky lg:top-28 lg:self-start">
@@ -353,30 +353,30 @@ function UserProfilePage() {
                   <span className="text-white text-sm font-medium">Online</span>
                 </div>
               )}
-            </div>
 
-            {/* Photo Thumbnails */}
-            {photos.length > 0 && (
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted">
-                {photos.map((photo, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentPhotoIndex(index)}
-                    className={`relative flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden transition-all ${
-                      index === currentPhotoIndex
-                        ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
-                        : 'opacity-70 hover:opacity-100'
-                    }`}
-                  >
-                    <img
-                      src={photo}
-                      alt={`Photo ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
+              {/* Photo Thumbnails - floating on top of photo */}
+              {photos.length > 1 && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-2">
+                  {photos.map((photo, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentPhotoIndex(index)}
+                      className={`relative flex-shrink-0 w-12 h-12 rounded-full overflow-hidden transition-all ${
+                        index === currentPhotoIndex
+                          ? 'ring-2 ring-white scale-110'
+                          : 'opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <img
+                        src={photo}
+                        alt={`Photo ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Profile Info - Right side on desktop */}
@@ -485,8 +485,8 @@ function UserProfilePage() {
         </div>
       </div>
 
-      {/* Fixed Bottom Actions */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border p-4">
+      {/* Fixed Bottom Actions - positioned above mobile nav on small screens */}
+      <div className="fixed bottom-16 sm:bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border p-4">
         <div className="max-w-6xl mx-auto flex gap-3 lg:w-1/2 lg:ml-auto lg:pr-4">
           <Button
             variant="outline"

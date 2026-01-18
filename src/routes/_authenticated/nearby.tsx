@@ -31,15 +31,6 @@ import {
   Shield,
   Star,
   Check,
-  MapPin,
-  Clock,
-  Plus,
-  Home,
-  Car,
-  Send,
-  Trash2,
-  Edit3,
-  Lock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -50,11 +41,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
-export const Route = createFileRoute('/_authenticated/members')({
-  component: MembersPage,
+export const Route = createFileRoute('/_authenticated/nearby')({
+  component: NearbyPage,
 })
 
 type NearbyUser = {
@@ -80,7 +69,7 @@ const FREE_PROFILE_LIMIT = 10
 const ULTRA_PROFILE_LIMIT = 100
 const FREE_DAILY_VIEW_LIMIT = 5
 
-function MembersPage() {
+function NearbyPage() {
   const { user: convexUser } = useCurrentUser()
   const { checkoutUrl, isUltra } = useSubscription()
   const navigate = useNavigate()
@@ -121,35 +110,6 @@ function MembersPage() {
   // Wave mutation
   const sendWave = useMutation(api.admirers.sendWave)
 
-  // Looking Now state
-  const [lookingNowExpanded, setLookingNowExpanded] = useState(true)
-  const [createPostDialogOpen, setCreatePostDialogOpen] = useState(false)
-  const [editPostDialogOpen, setEditPostDialogOpen] = useState(false)
-  const [newPostMessage, setNewPostMessage] = useState('')
-  const [editPostMessage, setEditPostMessage] = useState('')
-  const [postLocationName, setPostLocationName] = useState('')
-  const [canHost, setCanHost] = useState<boolean | undefined>(undefined)
-  const [editCanHost, setEditCanHost] = useState<boolean | undefined>(undefined)
-
-  // Looking Now queries
-  const lookingNowPosts = useQuery(
-    api.lookingNow.getActivePosts,
-    convexUser?._id ? { currentUserId: convexUser._id } : 'skip'
-  )
-  const myActivePost = useQuery(
-    api.lookingNow.getMyActivePost,
-    convexUser?._id ? { userId: convexUser._id } : 'skip'
-  )
-  const postingStatus = useQuery(
-    api.lookingNow.getPostingStatus,
-    convexUser?._id ? { userId: convexUser._id } : 'skip'
-  )
-
-  // Looking Now mutations
-  const createPost = useMutation(api.lookingNow.createPost)
-  const deletePost = useMutation(api.lookingNow.deletePost)
-  const updatePost = useMutation(api.lookingNow.updatePost)
-
   const handleWaveWithAnimation = async (userId: string) => {
     if (!convexUser?._id) return
 
@@ -183,7 +143,11 @@ function MembersPage() {
       }, 800)
 
       // Show waves remaining toast for free users (if not already waved)
-      if (!result.alreadyWaved && result.wavesRemaining !== undefined && result.wavesRemaining <= 5) {
+      if (
+        !result.alreadyWaved &&
+        result.wavesRemaining !== undefined &&
+        result.wavesRemaining <= 5
+      ) {
         toast.info(`${result.wavesRemaining} waves remaining today`)
       }
 
@@ -436,96 +400,6 @@ function MembersPage() {
     }
   }
 
-  // Looking Now handlers
-  const handleCreatePost = async () => {
-    if (!convexUser?._id) return
-    if (!newPostMessage.trim()) {
-      toast.error('Please enter a message')
-      return
-    }
-
-    try {
-      await createPost({
-        userId: convexUser._id,
-        message: newPostMessage.trim(),
-        locationName: postLocationName.trim() || undefined,
-        canHost,
-      })
-      setNewPostMessage('')
-      setPostLocationName('')
-      setCanHost(undefined)
-      setCreatePostDialogOpen(false)
-      toast.success('Your post is now live!')
-    } catch (error) {
-      console.error('Failed to create post:', error)
-      toast.error('Failed to create post')
-    }
-  }
-
-  const handleUpdatePost = async () => {
-    if (!convexUser?._id || !myActivePost) return
-    if (!editPostMessage.trim()) {
-      toast.error('Please enter a message')
-      return
-    }
-
-    try {
-      await updatePost({
-        postId: myActivePost._id,
-        userId: convexUser._id,
-        message: editPostMessage.trim(),
-        locationName: postLocationName.trim() || undefined,
-        canHost: editCanHost,
-      })
-      setEditPostDialogOpen(false)
-      toast.success('Post updated!')
-    } catch (error) {
-      console.error('Failed to update post:', error)
-      toast.error('Failed to update post')
-    }
-  }
-
-  const handleDeletePost = async () => {
-    if (!convexUser?._id || !myActivePost) return
-
-    try {
-      await deletePost({
-        postId: myActivePost._id,
-        userId: convexUser._id,
-      })
-      toast.success('Post deleted')
-    } catch (error) {
-      console.error('Failed to delete post:', error)
-      toast.error('Failed to delete post')
-    }
-  }
-
-  const openEditPostDialog = () => {
-    if (myActivePost) {
-      setEditPostMessage(myActivePost.message)
-      setPostLocationName(myActivePost.locationName || '')
-      setEditCanHost(myActivePost.canHost)
-      setEditPostDialogOpen(true)
-    }
-  }
-
-  const formatTimeRemaining = (expiresAt: number) => {
-    const now = Date.now()
-    const remaining = expiresAt - now
-    if (remaining <= 0) return 'Expired'
-
-    const hours = Math.floor(remaining / (1000 * 60 * 60))
-    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`
-    }
-    return `${minutes}m`
-  }
-
-  // Filter out user's own posts for the carousel (they have a separate card)
-  const otherLookingNowPosts = lookingNowPosts?.filter((post) => !post.isOwn) || []
-
   const getLastSeenText = (lastActive?: number, isOnline?: boolean) => {
     if (isOnline) return 'Now'
     if (!lastActive) return 'Unknown'
@@ -618,8 +492,8 @@ function MembersPage() {
           </Dialog>
         )}
 
-        {/* Separator - only on mobile where view toggle is visible */}
-        <div className="w-px h-6 bg-border shrink-0 sm:hidden" />
+        {/* Separator */}
+        <div className="w-px h-6 bg-border shrink-0" />
         <Button
           variant={
             onlineOnly ||
@@ -843,11 +717,10 @@ function MembersPage() {
           <span className="hidden sm:inline">Age </span>35-50
         </Button>
         {/* View Toggle - at the end, desktop only */}
-        <div className="ml-auto shrink-0 hidden sm:flex items-center gap-1">
+        <div className="ml-auto shrink-0 hidden sm:block">
           <Button
             variant="ghost"
-            size="sm"
-            className="gap-1.5"
+            size="icon-sm"
             onClick={() =>
               setViewMode(viewMode === 'grid' ? 'detailed' : 'grid')
             }
@@ -858,221 +731,13 @@ function MembersPage() {
             }
           >
             {viewMode === 'grid' ? (
-              <>
-                <Grid3X3 className="w-4 h-4" />
-                <span>Grid View</span>
-              </>
+              <LayoutList className="w-4 h-4" />
             ) : (
-              <>
-                <LayoutList className="w-4 h-4" />
-                <span>Detail View</span>
-              </>
+              <Grid3X3 className="w-4 h-4" />
             )}
           </Button>
         </div>
       </div>
-
-      {/* Looking Now Carousel */}
-      {(lookingNowPosts !== undefined && (lookingNowPosts.length > 0 || myActivePost)) && (
-        <div className="sticky top-[6.5rem] z-30 bg-background border-b border-border">
-          {/* Header with count and expand/collapse */}
-          <button
-            onClick={() => setLookingNowExpanded(!lookingNowExpanded)}
-            className="w-full flex items-center justify-between px-4 py-2 hover:bg-muted/50 active:bg-muted/70 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-r from-primary to-primary/70 flex items-center justify-center">
-                <MapPin className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="font-semibold text-sm">Looking Now</span>
-              <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                {otherLookingNowPosts.length + (myActivePost ? 1 : 0)}
-              </Badge>
-            </div>
-            {lookingNowExpanded ? (
-              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            )}
-          </button>
-
-          {/* Collapsible carousel content */}
-          {lookingNowExpanded && (
-            <div className="overflow-x-auto scrollbar-none pb-3 px-4">
-              <div className="flex gap-3">
-                {/* User's active post card (if exists) - highlighted */}
-                {myActivePost && (
-                  <div className="shrink-0 w-44 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-2 border-primary/30 rounded-xl p-3 relative group">
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openEditPostDialog()
-                        }}
-                        className="w-6 h-6 rounded-full bg-background/80 flex items-center justify-center hover:bg-background transition-colors"
-                      >
-                        <Edit3 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeletePost()
-                        }}
-                        className="w-6 h-6 rounded-full bg-background/80 flex items-center justify-center hover:bg-destructive/20 transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3 text-destructive" />
-                      </button>
-                    </div>
-                    <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px] mb-2">
-                      <span className="w-1.5 h-1.5 bg-primary rounded-full mr-1 animate-pulse" />
-                      Your Post
-                    </Badge>
-                    <p className="text-sm font-medium text-foreground line-clamp-2 mb-2">
-                      {myActivePost.message}
-                    </p>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge variant="outline" className="text-[10px] py-0 px-1.5">
-                        <Clock className="w-2.5 h-2.5 mr-0.5" />
-                        {formatTimeRemaining(myActivePost.expiresAt)}
-                      </Badge>
-                      {myActivePost.canHost === true && (
-                        <Badge variant="outline" className="text-[10px] py-0 px-1.5">
-                          <Home className="w-2.5 h-2.5 mr-0.5" />
-                          Host
-                        </Badge>
-                      )}
-                      {myActivePost.canHost === false && (
-                        <Badge variant="outline" className="text-[10px] py-0 px-1.5">
-                          <Car className="w-2.5 h-2.5 mr-0.5" />
-                          Travel
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Create post CTA (if no active post and can post) */}
-                {!myActivePost && postingStatus?.canPost && (
-                  <button
-                    onClick={() => setCreatePostDialogOpen(true)}
-                    className="shrink-0 w-44 border-2 border-dashed border-border rounded-xl p-3 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-accent/30 transition-all"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Plus className="w-5 h-5 text-primary" />
-                    </div>
-                    <span className="text-xs font-medium text-center">Post what you're looking for</span>
-                  </button>
-                )}
-
-                {/* Daily limit reached card (if no active post and can't post) */}
-                {!myActivePost && postingStatus && !postingStatus.canPost && (
-                  <div
-                    onClick={() => checkoutUrl && (window.location.href = checkoutUrl)}
-                    className="shrink-0 w-44 bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer hover:from-amber-500/20 hover:to-orange-500/20 transition-all"
-                  >
-                    <Lock className="w-6 h-6 text-amber-500" />
-                    <span className="text-xs font-medium text-center">Daily limit reached</span>
-                    <span className="text-[10px] text-amber-600">Upgrade for more</span>
-                  </div>
-                )}
-
-                {/* Other users' Looking Now cards */}
-                {otherLookingNowPosts.map((post, index) => {
-                  const isLocked = !isUltra && index >= 3
-
-                  return (
-                    <div
-                      key={post._id}
-                      onClick={() => {
-                        if (!isLocked) {
-                          navigate({ to: '/user/$userId', params: { userId: post.user._id } })
-                        }
-                      }}
-                      className={`shrink-0 w-44 bg-card border border-border rounded-xl p-3 transition-all ${
-                        isLocked
-                          ? 'relative cursor-default'
-                          : 'cursor-pointer hover:border-primary/50 hover:shadow-lg'
-                      }`}
-                    >
-                      <div className={isLocked ? 'blur-sm' : ''}>
-                        {/* User info */}
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="relative">
-                            <Avatar className="w-8 h-8 border border-border">
-                              {post.user.profile?.profilePhotoUrl ? (
-                                <AvatarImage src={post.user.profile.profilePhotoUrl} alt={post.user.profile?.displayName || post.user.name} />
-                              ) : post.user.imageUrl ? (
-                                <AvatarImage src={post.user.imageUrl} alt={post.user.name} />
-                              ) : (
-                                <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                                  {(post.user.profile?.displayName || post.user.name).charAt(0)}
-                                </AvatarFallback>
-                              )}
-                            </Avatar>
-                            {post.user.isOnline && (
-                              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-card" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold truncate">
-                              {post.user.profile?.displayName || post.user.name}
-                              {post.user.profile?.age && <span className="text-muted-foreground font-normal">, {post.user.profile.age}</span>}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Message */}
-                        <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                          {post.message}
-                        </p>
-
-                        {/* Badges */}
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {post.canHost === true && (
-                            <Badge variant="outline" className="text-[10px] py-0 px-1.5">
-                              <Home className="w-2.5 h-2.5 mr-0.5" />
-                              Host
-                            </Badge>
-                          )}
-                          {post.canHost === false && (
-                            <Badge variant="outline" className="text-[10px] py-0 px-1.5">
-                              <Car className="w-2.5 h-2.5 mr-0.5" />
-                              Travel
-                            </Badge>
-                          )}
-                          {post.locationName && (
-                            <Badge variant="outline" className="text-[10px] py-0 px-1.5 max-w-[80px] truncate">
-                              <MapPin className="w-2.5 h-2.5 mr-0.5 shrink-0" />
-                              {post.locationName}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Lock overlay for non-Ultra users */}
-                      {isLocked && (
-                        <div
-                          className="absolute inset-0 flex flex-col items-center justify-center bg-card/90 rounded-xl cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (checkoutUrl) {
-                              window.location.href = checkoutUrl
-                            }
-                          }}
-                        >
-                          <Lock className="w-5 h-5 text-muted-foreground mb-1" />
-                          <span className="text-xs font-medium text-muted-foreground">Upgrade to see</span>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Main Grid */}
       <main className="flex-1 p-2 sm:p-3">
         {nearbyUsers === undefined ? (
@@ -1124,7 +789,7 @@ function MembersPage() {
           <>
             {viewMode === 'grid' ? (
               /* Grid View */
-              (<div className="grid gap-1.5 sm:gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+              <div className="grid gap-1.5 sm:gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
                 {nearbyUsers.map((nearbyUser) => (
                   <div
                     key={nearbyUser._id}
@@ -1254,10 +919,10 @@ function MembersPage() {
                     </Button>
                   </div>
                 )}
-              </div>)
+              </div>
             ) : (
               /* Detailed View */
-              (<div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                 {nearbyUsers.map((nearbyUser) => (
                   <div
                     key={nearbyUser._id}
@@ -1457,7 +1122,7 @@ function MembersPage() {
                     </Button>
                   </div>
                 )}
-              </div>)
+              </div>
             )}
 
             {/* Low Activity Content - shows when there are few users */}
@@ -1847,6 +1512,7 @@ function MembersPage() {
           </div>
         </div>
       )}
+
       {/* Daily Limit Reached Modal for Free Users */}
       <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>
         <DialogContent className="max-w-sm">
@@ -1886,179 +1552,6 @@ function MembersPage() {
             <p className="text-xs text-center text-muted-foreground">
               Your daily limit resets at midnight
             </p>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Looking Now Post Dialog */}
-      <Dialog open={createPostDialogOpen} onOpenChange={setCreatePostDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-primary" />
-              Create a Looking Now Post
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div>
-              <label className="text-sm font-medium text-foreground mb-2 block">
-                What are you looking for right now?
-              </label>
-              <Textarea
-                placeholder="e.g., Looking for someone to grab drinks with tonight..."
-                value={newPostMessage}
-                onChange={(e) => setNewPostMessage(e.target.value)}
-                className="min-h-[100px] resize-none"
-                maxLength={280}
-              />
-              <p className="text-xs text-muted-foreground mt-1 text-right">
-                {newPostMessage.length}/280
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-2 block">
-                Location (optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Downtown, West Side, etc."
-                value={postLocationName}
-                onChange={(e) => setPostLocationName(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-                maxLength={50}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-2 block">
-                Hosting
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCanHost(canHost === true ? undefined : true)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                    canHost === true
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background border-border hover:border-primary/50'
-                  }`}
-                >
-                  <Home className="w-4 h-4" />
-                  Can Host
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCanHost(canHost === false ? undefined : false)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                    canHost === false
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background border-border hover:border-primary/50'
-                  }`}
-                >
-                  <Car className="w-4 h-4" />
-                  Can Travel
-                </button>
-              </div>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground">
-                <Clock className="w-3 h-3 inline mr-1" />
-                Your post will be visible for {postingStatus?.postDurationHours || 1} hour{(postingStatus?.postDurationHours || 1) > 1 ? 's' : ''} and then automatically expire.
-              </p>
-              {postingStatus && !postingStatus.isUltra && (
-                <p className="text-xs text-amber-500 mt-2">
-                  <Sparkles className="w-3 h-3 inline mr-1" />
-                  Upgrade to Ultra for 4-hour visibility and unlimited posts!
-                </p>
-              )}
-            </div>
-            <Button
-              className="w-full"
-              onClick={handleCreatePost}
-              disabled={!newPostMessage.trim()}
-            >
-              <Send className="w-4 h-4 mr-2" />
-              Post Now
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Looking Now Post Dialog */}
-      <Dialog open={editPostDialogOpen} onOpenChange={setEditPostDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Edit3 className="w-5 h-5 text-primary" />
-              Edit Your Post
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div>
-              <label className="text-sm font-medium text-foreground mb-2 block">
-                What are you looking for right now?
-              </label>
-              <Textarea
-                placeholder="e.g., Looking for someone to grab drinks with tonight..."
-                value={editPostMessage}
-                onChange={(e) => setEditPostMessage(e.target.value)}
-                className="min-h-[100px] resize-none"
-                maxLength={280}
-              />
-              <p className="text-xs text-muted-foreground mt-1 text-right">
-                {editPostMessage.length}/280
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-2 block">
-                Location (optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Downtown, West Side, etc."
-                value={postLocationName}
-                onChange={(e) => setPostLocationName(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-                maxLength={50}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-2 block">
-                Hosting
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditCanHost(editCanHost === true ? undefined : true)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                    editCanHost === true
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background border-border hover:border-primary/50'
-                  }`}
-                >
-                  <Home className="w-4 h-4" />
-                  Can Host
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditCanHost(editCanHost === false ? undefined : false)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                    editCanHost === false
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background border-border hover:border-primary/50'
-                  }`}
-                >
-                  <Car className="w-4 h-4" />
-                  Can Travel
-                </button>
-              </div>
-            </div>
-            <Button
-              className="w-full"
-              onClick={handleUpdatePost}
-              disabled={!editPostMessage.trim()}
-            >
-              Save Changes
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
