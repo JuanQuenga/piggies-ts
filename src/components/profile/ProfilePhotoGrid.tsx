@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useRef, useState, useCallback } from "react"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
@@ -40,12 +40,16 @@ export function ProfilePhotoGrid({ userId, isUltra }: ProfilePhotoGridProps) {
   const [photoToDelete, setPhotoToDelete] = useState<Id<"_storage"> | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [viewingPhoto, setViewingPhoto] = useState<string | null>(null)
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [touchStartX, setTouchStartX] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const profilePhotos = useQuery(api.users.getProfilePhotos, { userId })
   const generateUploadUrl = useMutation(api.messages.generateUploadUrl)
   const addProfilePhoto = useMutation(api.users.addProfilePhoto)
   const removeProfilePhoto = useMutation(api.users.removeProfilePhoto)
+  const reorderProfilePhotos = useMutation(api.users.reorderProfilePhotos)
 
   const maxSize = isUltra ? ULTRA_LIMIT : FREE_LIMIT
   const maxSizeMB = isUltra ? 25 : 5
@@ -137,6 +141,79 @@ export function ProfilePhotoGrid({ userId, isUltra }: ProfilePhotoGridProps) {
     fileInputRef.current?.click()
   }
 
+  // Handle reordering photos
+  const handleReorder = useCallback(async (fromIndex: number, toIndex: number) => {
+    if (!profilePhotos || fromIndex === toIndex) return
+
+    const photoIds = profilePhotos.map(p => p.storageId)
+    const [movedId] = photoIds.splice(fromIndex, 1)
+    photoIds.splice(toIndex, 0, movedId)
+
+    try {
+      await reorderProfilePhotos({ userId, photoIds })
+      toast.success("Photos reordered")
+    } catch (err) {
+      toast.error("Failed to reorder photos")
+    }
+  }, [profilePhotos, reorderProfilePhotos, userId])
+
+  // Drag handlers for desktop
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = "move"
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index)
+    }
+  }
+
+  const handleDragEnd = () => {
+    if (draggedIndex !== null && dragOverIndex !== null) {
+      handleReorder(draggedIndex, dragOverIndex)
+    }
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  // Touch handlers for mobile
+  const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    const touch = e.touches[0]
+    setTouchStartX(touch.clientX)
+    setDraggedIndex(index)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (draggedIndex === null || touchStartX === null) return
+
+    const touch = e.touches[0]
+    const deltaX = Math.abs(touch.clientX - touchStartX)
+
+    // Only reorder if significant horizontal movement
+    if (deltaX > 30) {
+      e.preventDefault()
+      const element = document.elementFromPoint(touch.clientX, touch.clientY)
+      const slot = element?.closest('[data-photo-index]')
+      if (slot) {
+        const newIndex = parseInt(slot.getAttribute('data-photo-index') || '-1')
+        if (newIndex >= 0 && newIndex !== draggedIndex && profilePhotos?.[newIndex]) {
+          setDragOverIndex(newIndex)
+        }
+      }
+    }
+  }
+
+  const handleTouchEnd = () => {
+    if (draggedIndex !== null && dragOverIndex !== null) {
+      handleReorder(draggedIndex, dragOverIndex)
+    }
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+    setTouchStartX(null)
+  }
+
   const photoCount = profilePhotos?.length ?? 0
   const canAddMore = photoCount < MAX_PHOTOS
 
@@ -171,9 +248,19 @@ export function ProfilePhotoGrid({ userId, isUltra }: ProfilePhotoGridProps) {
         {slots.map(({ index, photo }) => (
           <div
             key={index}
+            data-photo-index={index}
+            draggable={!!photo}
+            onDragStart={photo ? (e) => handleDragStart(e, index) : undefined}
+            onDragOver={photo ? (e) => handleDragOver(e, index) : undefined}
+            onDragEnd={photo ? handleDragEnd : undefined}
+            onTouchStart={photo ? (e) => handleTouchStart(e, index) : undefined}
+            onTouchMove={photo ? handleTouchMove : undefined}
+            onTouchEnd={photo ? handleTouchEnd : undefined}
             className={cn(
-              "relative aspect-square rounded-xl overflow-hidden",
-              photo ? "bg-muted" : "border-2 border-dashed border-border"
+              "relative aspect-square rounded-xl overflow-hidden transition-all duration-200",
+              photo ? "bg-muted cursor-grab active:cursor-grabbing" : "border-2 border-dashed border-border",
+              draggedIndex === index && "opacity-50 scale-95",
+              dragOverIndex === index && "ring-2 ring-primary ring-offset-2"
             )}
           >
             {photo ? (
@@ -181,27 +268,35 @@ export function ProfilePhotoGrid({ userId, isUltra }: ProfilePhotoGridProps) {
                 <img
                   src={photo.url ?? ""}
                   alt={`Profile photo ${index + 1}`}
-                  className="w-full h-full object-cover cursor-pointer"
+                  className="w-full h-full object-cover pointer-events-none"
+                />
+                {/* Tap to view overlay - only on center area */}
+                <button
+                  className="absolute inset-4 z-10"
                   onClick={() => setViewingPhoto(photo.url)}
+                  aria-label="View photo"
                 />
                 {/* Primary indicator */}
                 {photo.isPrimary && (
-                  <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-0.5 rounded-full text-xs flex items-center gap-1">
+                  <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-0.5 rounded-full text-xs flex items-center gap-1 pointer-events-none">
                     <Star className="w-3 h-3" />
                     Primary
                   </div>
                 )}
-                {/* Delete button */}
+                {/* Delete button - always visible on mobile */}
                 <Button
                   variant="destructive"
                   size="icon"
-                  className="absolute top-2 right-2 w-8 h-8 opacity-0 hover:opacity-100 transition-opacity"
-                  onClick={() => setPhotoToDelete(photo.storageId)}
+                  className="absolute top-2 right-2 w-8 h-8 opacity-100 md:opacity-0 md:hover:opacity-100 transition-opacity z-20"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setPhotoToDelete(photo.storageId)
+                  }}
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
-                {/* Drag handle (for future drag-to-reorder) */}
-                <div className="absolute bottom-2 left-2 bg-black/50 text-white p-1 rounded opacity-0 hover:opacity-100 transition-opacity">
+                {/* Drag handle - always visible on mobile */}
+                <div className="absolute bottom-2 left-2 bg-black/50 text-white p-1.5 rounded opacity-100 md:opacity-0 md:hover:opacity-100 transition-opacity pointer-events-none">
                   <GripVertical className="w-4 h-4" />
                 </div>
               </>
@@ -222,6 +317,13 @@ export function ProfilePhotoGrid({ userId, isUltra }: ProfilePhotoGridProps) {
           </div>
         ))}
       </div>
+
+      {/* Reorder hint */}
+      {photoCount > 1 && (
+        <p className="text-xs text-muted-foreground text-center">
+          Drag photos to reorder. First photo is your profile picture.
+        </p>
+      )}
 
       {/* Upload preview dialog */}
       <Dialog open={!!selectedFile} onOpenChange={() => handleCancel()}>
